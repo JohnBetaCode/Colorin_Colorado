@@ -223,9 +223,9 @@ attributed to its book, as in Once Upon a Time.
 
 ## Phases
 
-**Phase 0: plan and repository** (this commit).
+**Phase 0: plan and repository.** Done.
 
-**Phase 1: MVP**
+**Phase 1: MVP.** Done on 2026-10-30; [architecture.md](architecture.md) lists where it differs.
 
 1. Scaffold from Once Upon a Time: config, Gemini client, usage, Docker on port 8502, plus
    `core/i18n.py` and the language switch.
@@ -244,12 +244,14 @@ attributed to its book, as in Once Upon a Time.
 
 - AI caption suggestions.
 - **Convert all pending** with a progress bar (synchronous, like Once Upon a Time).
-- Home thumbnails, usage panel, ZIP of the PNG pages.
-- `screenshots` and `usage-report` skills; README with sample pages.
+- ZIP of the PNG pages; delete single versions.
+- `screenshots` and `usage-report` skills.
+
+(Home thumbnails, the usage panel and the README sample pages shipped in phase 1.)
 
 **Phase 3**
 
-- Facing-pages layout and blank backs.
+- Facing-pages layout (blank backs shipped in phase 1).
 - More styles (`kawaii`, `mandala`).
 - Book templates with predefined caption fields (birds: name, habitat, fun fact; places: city,
   region, why it is famous).
@@ -266,6 +268,11 @@ attributed to its book, as in Once Upon a Time.
 - The cost of each conversion is visible in the app.
 - Switching the UI language changes every label in the app, and an English book exports with
   English labels from a Spanish UI.
+
+Checked on 2026-10-30 by the test suite (pure black and white in the exported PDF, labels in both
+languages, captions that do not fit are reported and clipped to the box) and by a Playwright run
+through the UI with three photos, one AI conversion included. A full 10-photo book has not been
+run end to end yet.
 
 ## Risks
 

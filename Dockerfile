@@ -2,10 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /workspace
 
-# DejaVu Sans gives the PDF export full Unicode coverage; Comic Neue is the friendlier face used
-# for titles and captions in the coloring book.
+# Andika (SIL), designed for children learning to read, is the typeface of the PDF.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core fonts-comic-neue \
+    && apt-get install -y --no-install-recommends fonts-sil-andika \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

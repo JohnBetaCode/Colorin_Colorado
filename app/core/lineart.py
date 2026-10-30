@@ -241,22 +241,33 @@ def clean(data: bytes | Image.Image, age_group: str) -> CleanResult:
     return CleanResult(image, warnings, round(stroke, 1), round(black_ratio, 3), regions)
 
 
-# Draft engine: blur strength and adaptive-threshold window per age group.
-_DRAFT_BLUR = {"3-5": 11, "6-8": 7, "9+": 5}
+# Draft engine: the photo is flattened into a few color areas (mean shift + k-means)
+# and the borders between areas become the lines, so every area is closed and can be
+# colored. Fewer colors and smoother borders for younger kids and for cartoon style.
+DRAFT_SIZE = 700
+_DRAFT_COLORS = {"3-5": 6, "6-8": 10, "9+": 14}
+_DRAFT_SMOOTH = {"3-5": 11, "6-8": 9, "9+": 7}
 
 
 def draft(photo: bytes | Image.Image, style: str, age_group: str) -> Image.Image:
     """Offline line drawing of the photo (grayscale; pass it through ``clean``)."""
-    gray = np.array(load_image(photo).convert("L"))
-    gray = _resize_long_side(gray, 1600)
-    blur = _DRAFT_BLUR.get(age_group, 7) + (4 if style == "cartoon" else 0)
-    smooth = gray
-    for _ in range(3 if style == "cartoon" else 2):
-        smooth = cv2.bilateralFilter(smooth, 9, 60, 60)
-    smooth = cv2.medianBlur(smooth, blur)
-    return Image.fromarray(
-        cv2.adaptiveThreshold(smooth, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, blur + 4, 5)
-    )
+    rgb = np.array(load_image(photo))
+    h, w = rgb.shape[:2]
+    scale = DRAFT_SIZE / max(h, w)
+    small = cv2.resize(rgb, (max(1, round(w * scale)), max(1, round(h * scale))), interpolation=cv2.INTER_AREA)
+    small = cv2.pyrMeanShiftFiltering(small, 15, 35)
+    colors = _DRAFT_COLORS.get(age_group, 10) - (2 if style == "cartoon" else 0)
+    pixels = cv2.cvtColor(small, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
+    cv2.setRNGSeed(0)  # same photo, same draft
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    _, labels, _ = cv2.kmeans(pixels, colors, None, criteria, 2, cv2.KMEANS_PP_CENTERS)
+    areas = labels.reshape(small.shape[:2]).astype(np.uint8)
+    for _ in range(2):
+        areas = cv2.medianBlur(areas, _DRAFT_SMOOTH.get(age_group, 9))
+    edges = np.zeros(areas.shape, bool)
+    edges[:, 1:] |= areas[:, 1:] != areas[:, :-1]
+    edges[1:, :] |= areas[1:, :] != areas[:-1, :]
+    return Image.fromarray(np.where(edges, 0, 255).astype(np.uint8))
 
 
 def to_png(image: Image.Image) -> bytes:

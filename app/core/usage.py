@@ -37,11 +37,11 @@ _current_book: str | None = None
 
 
 @contextmanager
-def book_context(slug: str):
-    """Attribute all Gemini calls inside this block to a book."""
+def book_context(book_id: str):
+    """Attribute all Gemini calls inside this block to a book (by id: slugs are reused)."""
     global _current_book
     previous = _current_book
-    _current_book = slug
+    _current_book = book_id
     try:
         yield
     finally:

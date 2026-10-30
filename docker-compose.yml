@@ -22,4 +22,5 @@ services:
       - HOME=/tmp
       - GOOGLE_APPLICATION_CREDENTIALS=/gcloud/adc.json
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
+      - STREAMLIT_CLIENT_TOOLBAR_MODE=minimal
     restart: unless-stopped

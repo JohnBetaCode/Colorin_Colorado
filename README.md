@@ -1,12 +1,64 @@
 # 🖍️ Colorín Colorado
 
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-app-FF4B4B?logo=streamlit&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini-image-8E75B2?logo=googlegemini&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker-compose%20up-2496ED?logo=docker&logoColor=white)
+
 Turn your own photos into a printable coloring book for kids.
 
-Upload photos, convert them one by one into black-and-white line art (realistic or cartoon), add a
-short caption about what each page shows, and export a PDF where every coloring page carries a
-small color reference photo and an info box. A bird book shows the real bird and where it lives;
-a book of famous places in Colombia shows a small photo of the place and what you are coloring.
+Upload photos, convert them one by one into black-and-white line art, write a line about what
+each page shows, and export a PDF where every coloring page carries the real photo and an info
+box. A bird book shows the real bird and where it lives; a book of famous places in Colombia
+shows a small photo of the place and what you are coloring.
 
-Sibling project of [Once Upon a Time](https://github.com/JohnBetaCode/Once_Upon_a_Time).
+> *Colorín colorado, este cuento se ha acabado.* The Spanish line that closes a children's story,
+> the way [Once Upon a Time](https://github.com/JohnBetaCode/Once_Upon_a_Time) opens one.
 
-**Status:** planning. See the [plan](docs/plan.md).
+![Two pages of a sample book](docs/images/sample-pages.jpg)
+
+## From photo to coloring page
+
+Pick a style (realistic or cartoon) and an age group (3–5, 6–8, 9+). The photo is always the
+reference, so the toucan stays a keel-billed toucan and the boy stays the same boy.
+
+![Photo, realistic and cartoon coloring pages](docs/images/photo-to-page.jpg)
+
+Whatever the model returns, the page that reaches the PDF is pure black and white: copied colors
+are dropped, solid black areas become outlines, lines are thickened for small hands, and a
+"photo of a printed page" is cut down to the drawing. See the [spike](docs/spike.md) for what
+the model gets wrong and how each case is handled.
+
+## The workbench
+
+One page at a time: the photo and its caption on the left, the coloring page and its versions on
+the right. Crop, convert, regenerate with instructions, approve, next.
+
+![Workbench](docs/images/ui-workbench.png)
+
+## What you get
+
+- **Any photos.** JPG, PNG, WebP or HEIC straight from the phone.
+- **Two styles, three ages.** Realistic or cartoon; line weight and detail follow the age group.
+- **Versions, never lost.** Every conversion is kept; pick the one you like.
+- **A free draft mode** to lay out a book before spending anything.
+- **A print-ready PDF**: cover, "this book belongs to" page, one coloring page per sheet with the
+  reference photo and caption, Letter or A4, optional blank backs for double-sided printing.
+- **Spanish and English**, for the app and for each book.
+- **Costs in sight.** About $0.17 per AI conversion, tracked per book.
+
+## Try it
+
+The [setup guide](docs/setup.md) gets it running with Docker in a few minutes, then open
+http://localhost:8502 and create your first book.
+
+## Learn more
+
+- [Setup](docs/setup.md): requirements, running, configuration, tests, troubleshooting.
+- [User guide](docs/usage.md): a book from start to finish, captions, export options, costs.
+- [Architecture](docs/architecture.md): modules, data layout, pipelines, design decisions.
+- [Plan](docs/plan.md) and [line-art spike](docs/spike.md).
+
+Sample photos from Wikimedia Commons: toucan by Bernard Gagnon (CC0), Las Lajas Sanctuary by
+Diego Delso (CC BY-SA 4.0), laughing boy by Basile Morin (CC BY-SA 4.0), girl with pigeons by
+Ken Ketch (CC BY 2.0).

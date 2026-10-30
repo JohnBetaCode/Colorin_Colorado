@@ -7,7 +7,9 @@ through ``lineart.clean`` before anyone sees it.
 
 from __future__ import annotations
 
-from app.core import gemini
+from app.core import gemini, lineart, pages, usage
+from app.core.books import now
+from app.core.schema import Book, Engine, Page, Version
 
 STYLE_PROMPTS = {
     "realistic": (
@@ -127,3 +129,32 @@ def build_prompt(style: str, age_group: str, background: str, title: str = "", i
 def render_coloring_page(photo: bytes, size: tuple[int, int], prompt: str) -> bytes:
     """Raw model output for one photo (PNG bytes, not yet cleaned)."""
     return gemini.generate_image(prompt, reference_images=[photo], aspect_ratio=aspect_for(*size), image_size="2K")
+
+
+def convert_page(book: Book, page: Page, engine: Engine) -> Page:
+    """Convert a page's (cropped) photo and store the result as its new selected version.
+
+    ``engine`` is ``"gemini"`` (AI, paid) or ``"draft"`` (offline, free). Raises
+    ``gemini.GeminiError`` when the AI call fails; nothing is stored in that case.
+    """
+    style = page.style or book.style
+    background = page.background or book.background
+    photo = pages.cropped_photo(book.slug, page)
+    if engine == "gemini":
+        prompt = build_prompt(style, book.age_group, background, page.title, page.instructions)
+        with usage.book_context(book.id):
+            raw = render_coloring_page(pages.jpeg_bytes(photo), photo.size, prompt)
+    else:
+        raw = lineart.to_png(lineart.draft(photo, style, book.age_group))
+    cleaned = lineart.clean(raw, book.age_group)
+    version = Version(
+        n=0,
+        engine=engine,
+        style=style,
+        age_group=book.age_group,
+        background=background,
+        instructions=page.instructions,
+        warnings=cleaned.warnings,
+        created_at=now(),
+    )
+    return pages.add_version(book.slug, page.id, version, raw, cleaned.image)
