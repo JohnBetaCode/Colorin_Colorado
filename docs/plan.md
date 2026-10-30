@@ -280,8 +280,5 @@ attributed to its book, as in Once Upon a Time.
 ## Decisions
 
 - **2026-10-30, UI language:** Spanish and English, switchable (see [Languages](#languages)).
-
-## Open decisions
-
-- **Repository visibility:** created private; switch to public when there is something to show.
-- **Name:** *Colorín Colorado* unless there is a better one.
+- **2026-10-30, name:** *Colorín Colorado*.
+- **2026-10-30, repository visibility:** private.
