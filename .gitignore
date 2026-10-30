@@ -15,3 +15,6 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Prompt spike: downloaded test photos and generated results
+spike/

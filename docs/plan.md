@@ -216,8 +216,8 @@ without confirmation.
 
 ## Costs
 
-One conversion is one image generation (`gemini-3-pro-image`, about $0.13 per image at the current
-`PRICING`). A 20-page book at ~1.5 attempts per page is ~30 images, about **$4**. Caption
+One conversion is one image generation (`gemini-3-pro-image`, about $0.17 per image measured in the
+[spike](spike.md)). A 20-page book at ~1.5 attempts per page is ~30 images, about **$5**. Caption
 suggestions cost cents. The draft engine is free. Every call is recorded in `data/usage.jsonl` and
 attributed to its book, as in Once Upon a Time.
 
@@ -232,10 +232,10 @@ attributed to its book, as in Once Upon a Time.
 2. **De-risk first:** a throwaway script converts 5 test photos (bird, landmark, pet, person, busy
    scene) in both styles and all three age groups, then runs the cleanup. Tune the prompts until
    the outputs are clean, closed-shape line art. The whole product rests on this, so it happens
-   before any UI.
+   before any UI. Done: see [spike.md](spike.md).
 3. Schema and storage: books, pages, versions; upload with EXIF rotation, HEIC and downscaling.
 4. `lineart.clean()`, quality warnings and the draft engine.
-5. Workbench: convert, regenerate with instructions, versions, approve, captions, prev/next.
+5. Workbench: crop, convert, regenerate with instructions, versions, approve, captions, prev/next.
 6. Pages grid: order, exclude, delete, cover.
 7. PDF export: cover, owner page, bottom-box layout, Letter/A4, inline preview, download.
 8. Docs (`README.md`, `docs/architecture.md`, `docs/setup.md`), `CLAUDE.md`, `run-app` skill.

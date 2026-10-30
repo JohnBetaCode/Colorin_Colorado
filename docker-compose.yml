@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    container_name: colorin-colorado
+    # Run as the host user so books/ and data/ stay owned by you, not root.
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "8502:8502"
+    volumes:
+      # Live-reload the code while developing
+      - ./app:/workspace/app
+      - ./tests:/workspace/tests
+      - ./scripts:/workspace/scripts
+      # Books (photos, coloring pages, exports) and the usage log persist on the host
+      - ./books:/workspace/books
+      - ./data:/workspace/data
+      # Settings (config/.env)
+      - ./config:/workspace/config
+      # Google Application Default Credentials from the host
+      - ~/.config/gcloud/application_default_credentials.json:/gcloud/adc.json:ro
+    environment:
+      - HOME=/tmp
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcloud/adc.json
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
+    restart: unless-stopped
