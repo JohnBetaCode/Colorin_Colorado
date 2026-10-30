@@ -1,0 +1,17 @@
+# Secrets
+config/.env
+
+# Runtime state (user photos, generated pages, exports, usage log)
+books/
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
