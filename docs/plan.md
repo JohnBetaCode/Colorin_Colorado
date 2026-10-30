@@ -61,8 +61,8 @@ book, as in Once Upon a Time.
 ## User flow
 
 1. **Home.** List of books with a thumbnail and progress (`7/12 approved`). *New book* asks for
-   title, subtitle, dedication/author, style, age group, page size and the language of the PDF
-   labels.
+   title, subtitle, dedication/author, style, age group, page size and the book language
+   (defaults to the current UI language).
 2. **Upload.** Drag and drop many photos (JPG, PNG, WebP, HEIC). Each one becomes a page in upload
    order. EXIF rotation is applied and the photo is downscaled to 2048 px on the long side.
 3. **Workbench**, one page at a time:
@@ -78,6 +78,22 @@ book, as in Once Upon a Time.
    the cover page.
 5. **Export.** Layout options, build, inline preview (`st.pdf`) and download. Every build is a new
    file; nothing is overwritten.
+
+## Languages
+
+The app speaks **Spanish and English**, with a switch in the sidebar. There are two separate
+settings:
+
+- **UI language**: the language of the app itself. Saved as `UI_LANGUAGE` in `config/.env`
+  (`es` by default), so it survives restarts.
+- **Book language** (`Book.language`): the language of the book's fixed PDF labels ("Este libro
+  pertenece a" / "This book belongs to") and of AI caption suggestions. A new book starts with the
+  current UI language, and you can change it, so a Spanish UI can produce an English book.
+
+Every user-facing string goes through `core/i18n.py`: a `STRINGS` table with an `es` and an `en`
+entry per key, and `t(key, **params)`. The UI modules contain no hard-coded user-facing text, and
+a test fails if any key is missing either language. Captions typed by the user are stored as typed;
+there is no translation. Prompts sent to Gemini stay in English.
 
 ## Styles
 
@@ -144,7 +160,7 @@ books/<slug>/                       git-ignored, bind-mounted into the container
 Pydantic models (`core/schema.py`):
 
 - **Book**: `id, slug, title, subtitle, dedication, style, age_group, page_size (letter | a4),
-  layout (bottom_box | facing_pages), labels_language (es | en), include_reference_photo,
+  layout (bottom_box | facing_pages), language (es | en), include_reference_photo,
   include_owner_page, blank_backs, cover_page_id, created_at, updated_at`.
 - **Page**: `id, original, original_name, title, subtitle, info, style (null = inherit book),
   background (keep | simplify | remove), instructions, versions, selected_version,
@@ -187,7 +203,7 @@ placed at 300 DPI; reference photos are re-encoded as bounded JPEGs to keep the 
 5. **Facing pages** (phase 3): left page shows the large color photo and the caption, right page
    the coloring page, for duplex printing and binding.
 
-Fixed labels ("Este libro pertenece a", page numbers) follow `labels_language`, Spanish by default.
+Fixed labels ("Este libro pertenece a" / "This book belongs to") follow the book `language`.
 
 ## AI captions (phase 2)
 
@@ -211,7 +227,8 @@ attributed to its book, as in Once Upon a Time.
 
 **Phase 1: MVP**
 
-1. Scaffold from Once Upon a Time: config, Gemini client, usage, Docker on port 8502.
+1. Scaffold from Once Upon a Time: config, Gemini client, usage, Docker on port 8502, plus
+   `core/i18n.py` and the language switch.
 2. **De-risk first:** a throwaway script converts 5 test photos (bird, landmark, pet, person, busy
    scene) in both styles and all three age groups, then runs the cleanup. Tune the prompts until
    the outputs are clean, closed-shape line art. The whole product rests on this, so it happens
@@ -247,6 +264,8 @@ attributed to its book, as in Once Upon a Time.
 - Each coloring page shows the reference photo and the caption box; long text never overflows.
 - Restarting the container keeps every book, page, version and export.
 - The cost of each conversion is visible in the app.
+- Switching the UI language changes every label in the app, and an English book exports with
+  English labels from a Spanish UI.
 
 ## Risks
 
@@ -258,8 +277,11 @@ attributed to its book, as in Once Upon a Time.
 | Big PDFs | 1-bit PNGs compress very well; reference photos are bounded JPEGs |
 | Privacy of family photos | Everything stays local in `books/` (git-ignored); only the photo being converted is sent to Vertex AI |
 
+## Decisions
+
+- **2026-10-30, UI language:** Spanish and English, switchable (see [Languages](#languages)).
+
 ## Open decisions
 
-- **UI language:** Spanish, English, or both. PDF labels default to Spanish either way.
 - **Repository visibility:** created private; switch to public when there is something to show.
 - **Name:** *Colorín Colorado* unless there is a better one.
