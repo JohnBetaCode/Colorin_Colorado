@@ -7,7 +7,7 @@
 ![Gemini](https://img.shields.io/badge/Gemini-image-8E75B2?logo=googlegemini&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-compose%20up-2496ED?logo=docker&logoColor=white)
 
-Turn your own photos into a coloring book for kids, to print at home or to sell on Amazon.
+Turn your own photos into a coloring book for kids.
 
 Upload photos, convert them one by one into black-and-white line art, write a line about what
 each page shows, and export a PDF where every coloring page carries the real photo and an info
@@ -42,18 +42,6 @@ the right. Crop, convert, regenerate with instructions, approve, next.
 
 ![Workbench](docs/images/ui-workbench.png)
 
-## Sell it on Amazon
-
-The **🛒 Amazon KDP** view turns the book into the two files Amazon's print-on-demand service asks
-for: an interior that meets KDP's specs, and a wraparound cover (back, spine and front) sized to
-the page count. The front can be one of your coloring pages, an image you upload, or a color
-illustration the AI draws from a collage of your pages, a description, or the book's theme. The
-view also estimates the printing cost and your royalty on Amazon.com, Amazon.co.uk or the EU
-stores, lists what to fix before uploading (photo licenses included), drafts the product page
-(description, keywords, categories) and makes the images for it: a 3D mockup and a look inside.
-
-![A KDP cover: the back with two pages, the front with an AI collage of the book's subjects](docs/images/kdp-cover.jpg)
-
 ## What you get
 
 - **Any photos.** JPG, PNG, WebP or HEIC straight from the phone, or a Wikimedia Commons link,
@@ -62,19 +50,16 @@ stores, lists what to fix before uploading (photo licenses included), drafts the
   weight and detail follow the age group; templates for nature, landmarks and family albums
   suggest what each page says.
 - **Convert the whole book at once**, or page by page in the workbench.
-- **Versions, never lost.** Every conversion and every cover image is kept; pick the one you like.
+- **Versions, never lost.** Every conversion is kept; pick the one you like.
 - **A free draft mode** to lay out a book before spending anything.
 - **Activities from your own pages**: a word search with the book's words, a maze, a
   connect-the-dots traced from a drawing, their solutions, a color test page, a diploma and a
   closing page.
 - **Bilingual books**: every caption in Spanish and English, translated by the AI and editable.
-- **Photo rights in check**: each photo's license, credits on the copyright page, and photos that
-  cannot be sold flagged before you upload.
+- **Photo credits**: each photo's author and license, printed on the copyright page.
 - **A print-ready PDF**: title page, copyright page with the photo credits, "this book belongs
   to" page, one coloring page per sheet with the reference photo and caption, in Letter, A4,
   8 × 10 or square, with blank backs so markers never bleed into another drawing.
-- **Ready for Amazon KDP**: interior and cover files, cost and royalty in three stores, a
-  pre-upload checklist, the product page drafted, and images for it.
 - **Spanish and English**, for the app and for each book.
 - **Duplicate a book, or move it as a ZIP** to back it up or open it on another computer.
 - **Your choice of access to Gemini**: a Google Cloud project, or just an API key.
@@ -90,8 +75,6 @@ http://localhost:8502 and create your first book.
 
 - [Setup](docs/setup.md): requirements, running, configuration, tests, troubleshooting.
 - [User guide](docs/usage.md): a book from start to finish, captions, export options, costs.
-- [Selling on Amazon](docs/amazon-kdp.md): KDP file specs, costs and royalties, AI disclosure,
-  photo rights, taxes and payments.
 - [Architecture](docs/architecture.md): modules, data layout, pipelines, design decisions.
 - [Plan](docs/plan.md) and [line-art spike](docs/spike.md).
 

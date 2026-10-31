@@ -95,6 +95,8 @@ a label in the background color at the top and the dedication on another at the 
 asked for no text in the image (the title is set by the app, so it is always spelled right) and a
 calm top quarter for the label. Each image is kept as a version; switch between them at any time.
 
+![A wraparound cover: the back with two pages, the front with an AI collage of the book's subjects](images/kdp-cover.jpg)
+
 **The back** has the back cover text and up to four more pages as line art; **the spine**, the
 title once it fits.
 
