@@ -11,7 +11,13 @@
   | Vertex AI API key | `vertex_key` | An API key for Vertex AI (Google Cloud console → APIs & Services → Credentials). No project ID or gcloud needed. |
   | Google AI Studio API key | `studio_key` | A key from [Google AI Studio](https://aistudio.google.com/apikey) (the Gemini Developer API). Model names there may differ, for example with a `-preview` suffix. |
 
-Without any of them the app still runs: the free draft engine converts photos offline.
+Without any of them the app still runs: the free draft engine and the mystery mosaics convert
+photos offline.
+
+The image includes PyTorch (CPU only) for removing the background of mosaics with SAM2, so the
+first build takes a few minutes and the image is about 1 GB bigger. The SAM2 model (base-plus,
+about 320 MB, public on Hugging Face, no account needed) downloads by itself the first time
+"Remove the background" is used, into `models/`, which survives rebuilds.
 
 ## Run
 
@@ -21,6 +27,7 @@ cd Colorin_Colorado
 cp config/.env.example config/.env   # then set the project or an API key, or do it from the app
 # Only with Google Cloud credentials (GEMINI_AUTH=adc): mount them into the container
 cp docker-compose.override.example.yml docker-compose.override.yml
+mkdir -p books data models   # so the folders are yours, not root's (Linux)
 docker compose up -d --build
 ```
 
@@ -77,8 +84,9 @@ when the file exists). Both `config/.env` and the override are git-ignored.
 |---|---|
 | `books/<slug>/` | Each book: `book.json`, `pages.json`, uploaded photos, every coloring-page version, cover images, PDF exports and KDP covers. |
 | `data/usage.jsonl` | One line per Gemini call with tokens and estimated cost. |
+| `models/huggingface/` | The downloaded SAM2 model (`HF_HOME`). Delete it to free space; it downloads again when needed. |
 
-Both are bind-mounted and git-ignored. Back up `books/` to keep your books.
+All three are bind-mounted and git-ignored. Back up `books/` to keep your books.
 
 ## Tests
 
@@ -107,3 +115,6 @@ read the PDF back and check that every coloring page is pure black and white.
 - **A code change does not show up**: Streamlit reloads changed modules only while a browser tab
   is connected. If you edited files with no tab open, `docker compose restart app`.
 - **Changes to `requirements.txt` or the `Dockerfile`**: `docker compose up -d --build`.
+- **"SAM2 is not installed"**: the image predates background removal; `docker compose up -d --build`.
+- **SAM2 download fails with a permission error**: `models/` was created by Docker as root;
+  `sudo chown -R $(id -u):$(id -g) models` (or delete it and `mkdir models`).

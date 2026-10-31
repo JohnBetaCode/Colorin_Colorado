@@ -192,6 +192,8 @@ def delete_page(slug: str, page_id: str) -> None:
         file.unlink()
     if folder.exists():
         folder.rmdir()
+    for mask in (book_path(slug) / "masks").glob(f"{page_id}-*.png"):  # background.py's cache
+        mask.unlink()
     save_pages(slug, [p for p in pages if p.id != page_id])
 
 

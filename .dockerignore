@@ -2,6 +2,7 @@
 config/.env
 books/
 data/
+models/
 spike/
 .git/
 **/__pycache__/

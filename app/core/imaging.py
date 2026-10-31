@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 
-from app.core import gemini, lineart, mosaic, pages, usage
+from app.core import background, gemini, lineart, mosaic, pages, usage
 from app.core.books import now
 from app.core.schema import Book, Engine, MosaicSettings, Page, Version
 
@@ -173,9 +173,13 @@ class Rendered:
 
 
 def mosaic_draft(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
-    """The mystery mosaic the page's current settings make, without storing it (previews)."""
+    """The mystery mosaic the page's current settings make, without storing it (previews).
+
+    Raises ``background.BackgroundError`` when the background cannot be removed.
+    """
     settings = mosaic.settings_for(book, page)
-    return mosaic.make_grid(pages.cropped_photo(book.slug, page), settings), settings
+    subject = background.subject_mask(book.slug, page, settings) if settings.remove_background else None
+    return mosaic.make_grid(pages.cropped_photo(book.slug, page), settings, subject), settings
 
 
 def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
@@ -221,7 +225,8 @@ def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = N
     ``engine`` is ``"gemini"`` (AI, paid), ``"draft"`` (offline, free) or ``"mosaic"`` (a
     mystery mosaic, offline, free). With ``replace``, that version is deleted once the new
     one is stored: versions are never overwritten, so the replacement gets the next number.
-    Raises ``gemini.GeminiError`` when the AI call fails; nothing is stored or deleted then.
+    Raises ``gemini.GeminiError`` when the AI call fails, or ``background.BackgroundError``
+    when a mosaic's background cannot be removed; nothing is stored or deleted then.
     """
     stored = _store(book, render_page(book, page, engine))
     if replace is not None:
@@ -247,7 +252,7 @@ def convert_pages(
             try:
                 _store(book, future.result())
                 error = None
-            except gemini.GeminiError as exc:
+            except (gemini.GeminiError, background.BackgroundError) as exc:
                 error = str(exc)
                 failures.append((page, error))
             if on_done:

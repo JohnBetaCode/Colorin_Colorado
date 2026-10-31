@@ -10,6 +10,13 @@ opencv-python-headless==4.12.0.88
 numpy==2.2.6                  # opencv-python-headless 4.12 needs numpy<2.3
 pypdfium2==4.30.0             # renders the PDFs into the listing images
 
+# Background removal for mosaics (SAM2, background.py). CPU-only torch: much smaller than the
+# default CUDA build, and SAM2 runs on the CPU in a few seconds per photo.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1
+torchvision==0.29.1           # needed by transformers' SAM2 image processor
+transformers==5.21.1
+
 # Tests
 pytest==8.4.2
 pypdf==6.1.1                  # reads images back out of exported PDFs

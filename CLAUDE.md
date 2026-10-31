@@ -35,7 +35,10 @@ name a country or city (the author's own books can be about anything).
 - Streamlit widgets fed from saved data: seed the key with `ui.common.seed` and do not pass
   `value=`/`index=`; keep option labels free of data that changes while the user works. See
   "UI rules" in `docs/architecture.md` for why (lost clicks).
-- `books/`, `data/`, `spike/` and `config/.env` are user data and git-ignored. Never commit them and
+- SAM2 (`background.py`) is the one local model: imported lazily, CPU-only torch from PyTorch's
+  CPU index in `requirements.txt`, weights in `models/` (`HF_HOME`). Tests fake `_predict`; the
+  real-model test runs only with `COLORIN_SAM_TEST=1`.
+- `books/`, `data/`, `models/`, `spike/` and `config/.env` are user data and git-ignored. Never commit them and
   never put a real GCP project ID or API key in `config/.env.example`.
 - When changing a model id (`GEMINI_*`), update `config/.env.example`, the defaults in
   `app/core/config.py`, `PRICING` in `app/core/usage.py`, and the table in `docs/setup.md`.

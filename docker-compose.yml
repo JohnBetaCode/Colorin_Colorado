@@ -16,10 +16,13 @@ services:
       - ./data:/workspace/data
       # Settings (config/.env)
       - ./config:/workspace/config
+      # Downloaded models (SAM2), kept between rebuilds
+      - ./models:/workspace/models
       # Google Cloud credentials (GEMINI_AUTH=adc) are mounted by docker-compose.override.yml,
       # created from docker-compose.override.example.yml; API keys need nothing here.
     environment:
       - HOME=/tmp
+      - HF_HOME=/workspace/models/huggingface
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
       - STREAMLIT_CLIENT_TOOLBAR_MODE=minimal
     restart: unless-stopped

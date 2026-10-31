@@ -10,7 +10,7 @@ from __future__ import annotations
 import streamlit as st
 from PIL import Image
 
-from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates
+from app.core import background, books, captions, commons, export, gemini, imaging, mosaic, pages, templates
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import (
@@ -190,7 +190,10 @@ def _approve(slug: str, page_id: str, next_id: str | None) -> None:
         st.session_state.wb_page = next_id
 
 
-MOSAIC_FIELDS = ("fill", "cells", "tones", "columns", "contrast", "brightness", "number_white")
+MOSAIC_FIELDS = (
+    "fill", "cells", "tones", "columns", "contrast", "brightness", "number_white",
+    "remove_background", "subject_x", "subject_y",
+)
 
 
 def _mosaic_from_widgets(page_id: str) -> MosaicSettings:
@@ -238,8 +241,24 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
             t("wb.mosaic_number_white"), help=t("wb.mosaic_number_white_help"),
             key=f"mosaic_number_white_{page.id}", **save,
         )
-        st.caption(t("wb.mosaic_preview"))
-        _render_mosaic_tabs(book, page, draft=True)
+        installed = background.available()
+        st.checkbox(
+            t("wb.mosaic_remove_background"),
+            help=t("wb.mosaic_remove_background_help", mb=background.MODEL_MB) if installed else t("wb.sam_missing"),
+            disabled=not installed, key=f"mosaic_remove_background_{page.id}", **save,
+        )
+        ready = True
+        if settings.remove_background and not installed:
+            st.warning(t("wb.sam_missing"))
+            ready = False
+        elif settings.remove_background:
+            col1, col2 = st.columns(2)
+            col1.slider(t("wb.mosaic_subject_x"), 0, 100, key=f"mosaic_subject_x_{page.id}", **save)
+            col2.slider(t("wb.mosaic_subject_y"), 0, 100, key=f"mosaic_subject_y_{page.id}", **save)
+            ready = _render_subject(book, page)
+        if ready:
+            st.caption(t("wb.mosaic_preview"))
+            _render_mosaic_tabs(book, page, draft=True)
         col1, col2 = st.columns(2)
         if col1.button(t("wb.mosaic_new"), type="primary", width="stretch", key=f"mosaic_new_{page.id}"):
             _convert(book, page, "mosaic")
@@ -266,6 +285,30 @@ def _mosaic_images(book_json: str, page_json: str, draft: bool) -> tuple[Image.I
     return export.mosaic_preview(book, page, grid, settings), solution
 
 
+@st.cache_data(max_entries=16, show_spinner=False)
+def _subject_outline(book_json: str, page_json: str) -> Image.Image:
+    """The photo with SAM2's cut and the subject point, to check what stays."""
+    book, page = Book.model_validate_json(book_json), Page.model_validate_json(page_json)
+    settings = mosaic.settings_for(book, page)
+    mask = background.subject_mask(book.slug, page, settings)
+    image = background.outline(pages.cropped_photo(book.slug, page), mask, (settings.subject_x, settings.subject_y))
+    image.thumbnail((PREVIEW_PX, PREVIEW_PX))
+    return image
+
+
+def _render_subject(book: Book, page: Page) -> bool:
+    """Show what SAM2 keeps; False (with the error shown) when it cannot."""
+    first = not background.model_downloaded()
+    with st.spinner(t("wb.sam_downloading", mb=background.MODEL_MB) if first else t("wb.sam_working")):
+        try:
+            image = _subject_outline(book.model_dump_json(), page.model_dump_json())
+        except background.BackgroundError as exc:
+            st.error(t("wb.sam_failed", error=exc))
+            return False
+    st.image(image, caption=t("wb.mosaic_subject_caption"), width="stretch")
+    return True
+
+
 def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
     printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
     puzzle_tab, solution_tab = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
@@ -278,7 +321,7 @@ def _convert(book: Book, page: Page, engine: Engine, replace: int | None = None)
     with st.spinner(t(spinner)):
         try:
             updated = imaging.convert_page(book, page, engine, replace=replace)
-        except gemini.GeminiError as exc:
+        except (gemini.GeminiError, background.BackgroundError) as exc:
             st.error(t("wb.failed", error=exc))
             return
     st.session_state.pop(f"version_{page.id}", None)

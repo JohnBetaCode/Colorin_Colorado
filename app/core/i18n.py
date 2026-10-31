@@ -319,6 +319,27 @@ STRINGS: dict[str, dict[str, str]] = {
     "mosaic_fill.lines": {"es": "Patrones de líneas (cuadrícula, diagonales, rayas)", "en": "Line patterns (grid, diagonals, stripes)"},
     "mosaic_fill.stipple": {"es": "Puntillismo (puntos más o menos juntos)", "en": "Stippling (dots closer or further apart)"},
     "mosaic_fill.geometric": {"es": "Geométricos (ajedrez, zigzag, guiones)", "en": "Geometric (checkers, zigzag, dashes)"},
+    "wb.mosaic_remove_background": {"es": "✂️ Quitar el fondo (SAM2)", "en": "✂️ Remove the background (SAM2)"},
+    "wb.mosaic_remove_background_help": {
+        "es": "SAM2 recorta el sujeto que está bajo el punto rojo (el centro de la foto, si no lo mueves) y el resto queda en blanco, sin números. Funciona sin internet y gratis; la primera vez descarga el modelo (unos {mb} MB) y tarda un poco más.",
+        "en": "SAM2 cuts out the subject under the red dot (the middle of the photo unless you move it) and the rest is left white, with no numbers. Works offline and free; the first time it downloads the model (about {mb} MB) and takes a little longer.",
+    },
+    "wb.sam_missing": {
+        "es": "SAM2 no está instalado en esta imagen de Docker. Reconstrúyela con «docker compose up -d --build».",
+        "en": "SAM2 is not installed in this Docker image. Rebuild it with “docker compose up -d --build”.",
+    },
+    "wb.mosaic_subject_x": {"es": "Punto del sujeto: horizontal (%)", "en": "Subject point: horizontal (%)"},
+    "wb.mosaic_subject_y": {"es": "Punto del sujeto: vertical (%)", "en": "Subject point: vertical (%)"},
+    "wb.mosaic_subject_caption": {
+        "es": "Lo que queda del fondo se ve claro. Si SAM2 tomó otra cosa, mueve el punto rojo sobre el sujeto.",
+        "en": "What is left of the background shows faded. If SAM2 took something else, move the red dot onto the subject.",
+    },
+    "wb.sam_downloading": {
+        "es": "Descargando el modelo SAM2 (unos {mb} MB, solo la primera vez)…",
+        "en": "Downloading the SAM2 model (about {mb} MB, only the first time)…",
+    },
+    "wb.sam_working": {"es": "Recortando el sujeto con SAM2…", "en": "Cutting out the subject with SAM2…"},
+    "wb.sam_failed": {"es": "No se pudo quitar el fondo: {error}", "en": "Could not remove the background: {error}"},
     "wb.mosaic_number_white": {"es": "Poner número en las casillas en blanco", "en": "Number the white cells too"},
     "wb.mosaic_number_white_help": {
         "es": "Sin número, el dibujo terminado queda limpio, pero las zonas blancas se ven antes de colorear. Con número, el misterio queda oculto del todo, pero esos números se verán en el dibujo terminado.",

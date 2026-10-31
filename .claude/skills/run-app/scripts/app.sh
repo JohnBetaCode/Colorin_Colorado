@@ -29,6 +29,12 @@ adc_override() {
   fi
 }
 
+# Bind-mounted folders: created here, owned by you, rather than by Docker (as root on Linux),
+# so the app can write books, the usage log and the downloaded SAM2 model.
+folders() {
+  mkdir -p books data models
+}
+
 wait_healthy() {
   for _ in $(seq 1 30); do
     if curl -s -o /dev/null --max-time 2 "$URL/_stcore/health"; then break; fi
@@ -44,6 +50,7 @@ case "${1:-status}" in
     ;;
   up)
     adc_override
+    folders
     docker compose up -d --build
     wait_healthy
     ;;
@@ -53,6 +60,7 @@ case "${1:-status}" in
     ;;
   rebuild)
     adc_override
+    folders
     docker compose build --no-cache app
     docker compose up -d
     wait_healthy

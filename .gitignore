@@ -5,6 +5,7 @@ docker-compose.override.yml
 # Runtime state (user photos, generated pages, exports, usage log)
 books/
 data/
+models/
 
 # Python
 __pycache__/

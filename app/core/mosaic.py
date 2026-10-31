@@ -122,17 +122,20 @@ def normalized(settings: MosaicSettings) -> MosaicSettings:
 # --- Grid -------------------------------------------------------------------------
 
 
-def _adjust(gray: np.ndarray, settings: MosaicSettings) -> np.ndarray:
+def _adjust(gray: np.ndarray, settings: MosaicSettings, sample: np.ndarray | None = None) -> np.ndarray:
     """Spread the photo's tones over the full range, then apply contrast and brightness.
 
     A plain stretch leaves most photos in the middle tones (a bird in grass is all mid
     gray), so it is blended with histogram equalization, which gives every tone a fair
-    share of the cells.
+    share of the cells. The range is measured on ``sample`` (the subject's pixels, when the
+    background is removed), else on the whole photo.
     """
-    low, high = np.percentile(gray, (1, 99))
+    sample = gray if sample is None or sample.size == 0 else sample
+    low, high = np.percentile(sample, (1, 99))
     stretched = np.clip((gray - low) / max(float(high - low), 1e-3), 0, 1)
-    ranked = np.sort(gray, axis=None)
-    equalized = np.searchsorted(ranked, gray, side="right") / ranked.size
+    ranked = np.sort(sample, axis=None)
+    # Middle rank: equal values share the middle of their run (a flat subject stays mid, not light).
+    equalized = (np.searchsorted(ranked, gray, side="left") + np.searchsorted(ranked, gray, side="right")) / (2 * ranked.size)
     value = EQUALIZE * equalized + (1 - EQUALIZE) * stretched
     value = (value - 0.5) * (1 + settings.contrast / 100) + 0.5 + settings.brightness / 100
     return np.clip(value, 0, 1)
@@ -148,8 +151,12 @@ def _error(total: np.ndarray, squares: np.ndarray, weight: float, tone: np.ndarr
     return squares - 2 * center * total + center * center * weight
 
 
-def make_grid(photo: Image.Image, settings: MosaicSettings) -> np.ndarray:
-    """The mosaic of a (cropped) photo: ``(rows, columns, 3)`` uint8, see the module docstring."""
+def make_grid(photo: Image.Image, settings: MosaicSettings, subject: np.ndarray | None = None) -> np.ndarray:
+    """The mosaic of a (cropped) photo: ``(rows, columns, 3)`` uint8, see the module docstring.
+
+    With a ``subject`` mask (bool, photo size), the tones are spread over the subject alone
+    and everything outside it is white paper.
+    """
     settings = normalized(settings)
     gray = np.asarray(photo.convert("L"), dtype=np.float32) / 255
     h, w = gray.shape
@@ -157,7 +164,13 @@ def make_grid(photo: Image.Image, settings: MosaicSettings) -> np.ndarray:
     rows = max(1, round(cols * h / w))
     k, tones = SAMPLES, settings.tones
     small = cv2.resize(gray, (cols * k, rows * k), interpolation=cv2.INTER_AREA)
-    cells = _adjust(small, settings).reshape(rows, k, cols, k).transpose(0, 2, 1, 3)
+    if subject is None:
+        value = _adjust(small, settings)
+    else:
+        # Share of subject under each sample: edges blend into the white background.
+        inside = cv2.resize(subject.astype(np.float32), (cols * k, rows * k), interpolation=cv2.INTER_AREA)
+        value = _adjust(small, settings, small[inside > 0.5]) * inside + (1 - inside)
+    cells = value.reshape(rows, k, cols, k).transpose(0, 2, 1, 3)
 
     total, squares = cells.sum(axis=(2, 3)), (cells * cells).sum(axis=(2, 3))
     whole = _quantize(total / (k * k), tones)

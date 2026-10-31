@@ -40,6 +40,7 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
 | `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three AI calls at a time, stored from the calling thread). |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
+| `core/background.py` | Background removal for mosaics with SAM2 (2.1 base-plus through `transformers`, CPU): `subject_mask` (the object under the subject point, cleaned, cached in `masks/`), `outline` (the check image), `available`/`model_downloaded`. Imports torch only when a mask is computed. |
 | `core/mosaic.py` | Mystery mosaics, the third engine: `make_grid` (photo → tones per cell or triangle), `render_solution` (1-bit), and the vector drawing of the puzzle, its legend and the solution. Settings per age group, book or page (`settings_for`). |
 | `core/export.py` | `preflight` (what the PDF will contain, captions that overflow, extras the pages cannot make), `sheets` (every interior page in print order) and `export_book_pdf`. |
 | `core/extras.py` | The extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page. Generated, never drawn by the AI, seeded with the book id; `available` says which ones the pages can make. |
@@ -64,6 +65,7 @@ books/<slug>/
   lineart/<page-id>/v<n>-raw.png  what the engine returned
   lineart/<page-id>/v<n>.png      1-bit cleaned coloring page
                                   (mosaic versions: v<n>-raw.png is the grid, v<n>.png the solution)
+  masks/<page-id>-<hash>.png      SAM2 subject masks, a cache keyed by crop, point and model
   cover_art/v<n>.jpg              front cover image, uploaded or drawn by the AI (RGB)
   exports/<slug>-<timestamp>.pdf  one file per build, never overwritten
   exports/covers/<slug>-cover-<pages>p-<timestamp>.pdf
@@ -124,6 +126,15 @@ stroked over the whole grid, clipped to the shapes of their tone; dots, dashes a
 dashed lines, whose dash restarts on each row, so shifting a row staggers them. `export.sheets` adds `mosaic_solutions:<i>`
 sheets (six per page, filled in, with number and title) after the activities, before the diploma
 and closing page. Mosaics are left out of the word search and the connect-the-dots.
+
+**Background removal.** With `remove_background`, `background.subject_mask` asks SAM2 for the
+object under the subject point (percent of the cropped photo, the middle by default) with one
+positive point, keeps the best of its three masks by predicted IoU, drops specks under 1% of it
+and fills its holes. `make_grid` then measures the tone range on the subject's pixels alone and
+blends every sample toward white by the share of background under it, so the background is white
+cells (without numbers) and the subject's edge follows the mask. On a CPU the model loads in about
+20 s once per process and takes 2–3 s per photo, hence the mask cache. The model's weights are in
+`models/huggingface` (`HF_HOME`); torch is the CPU build, from PyTorch's CPU index.
 
 ### Cleanup (`lineart.clean`)
 

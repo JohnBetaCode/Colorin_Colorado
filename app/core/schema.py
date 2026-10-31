@@ -69,6 +69,11 @@ class MosaicSettings(BaseModel):
     # White cells carry a number too: the picture stays hidden until colored, but the finished
     # page shows those digits.
     number_white: bool = False
+    # SAM2 cuts out the subject under this point (percent of the cropped photo) and the
+    # background becomes white (background.py).
+    remove_background: bool = False
+    subject_x: int = 50
+    subject_y: int = 50
 
     @field_validator("fill", mode="before")
     @classmethod
