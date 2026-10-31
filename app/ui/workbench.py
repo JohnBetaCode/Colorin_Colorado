@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import captions, commons, export, gemini, imaging, pages
+from app.core import captions, commons, export, gemini, imaging, pages, templates
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import BACKGROUNDS, LICENSES, STYLES, Book, Caption, Crop, Engine, Page
@@ -102,6 +102,12 @@ def _render_translation(book: Book, page: Page, page_list: list[Page]) -> None:
         st.rerun()
 
 
+def _use_template(book: Book, page_id: str) -> None:
+    labels = templates.labels(book)
+    pages.update_page(book.slug, page_id, info=labels)
+    st.session_state[f"info_{page_id}"] = labels
+
+
 def _fill_from_commons(slug: str, page_id: str) -> None:
     try:
         photo = commons.lookup(st.session_state[f"source_url_{page_id}"])
@@ -187,15 +193,18 @@ def _render_caption(book: Book, page: Page) -> None:
         seed(f"{field}_{page.id}", getattr(page, field))
         col.text_input(
             t(f"wb.caption_{field}"),
-            placeholder=t(f"wb.caption_{field}_placeholder"),
+            placeholder=t(f"template_subtitle.{book.template}") if field == "subtitle" else t("wb.caption_title_placeholder"),
             key=f"{field}_{page.id}",
             on_change=_save_field,
             args=(book.slug, page.id, field),
         )
+    labels = templates.labels(book)
+    if labels and not page.info.strip():
+        st.button(t("wb.use_template"), key=f"template_{page.id}", on_click=_use_template, args=(book, page.id))
     seed(f"info_{page.id}", page.info)
     st.text_area(
         t("wb.caption_info"),
-        placeholder=t("wb.caption_info_placeholder"),
+        placeholder=labels or t("wb.caption_info_placeholder"),
         height=150,
         key=f"info_{page.id}",
         on_change=_save_field,

@@ -162,3 +162,20 @@ def test_convert_pages_stores_every_result_and_reports_failures(photo, monkeypat
     assert sorted(count for count, _ in seen) == [1, 2, 3, 4]
     stored = {p.id: p for p in pages.load_pages(book.slug)}
     assert [stored[p.id].status for p in page_list] == ["converted", "converted", "pending", "converted"]
+
+
+def test_templates_set_the_background_and_the_caption_labels():
+    from app.core import templates
+
+    book = books.create_book("Aves del jardín", template="nature", background=templates.BACKGROUND["nature"], language="en")
+    assert book.background == "simplify"
+    assert templates.labels(book) == "Where it lives: \nWhat it eats: \nFun fact: "
+    book.template = "free"
+    assert templates.labels(book) == ""
+
+
+def test_new_styles_and_the_adult_level_have_prompts_and_cleanup():
+    prompt = imaging.build_prompt("mandala", "adult", "keep", "Tucán")
+    assert "patterns" in prompt and "INTRICATE" in prompt and "1/300" in prompt
+    assert "kawaii" in imaging.build_prompt("kawaii", "3-5", "remove")
+    assert lineart.MIN_STROKE_PX["adult"] < lineart.MIN_STROKE_PX["9+"]

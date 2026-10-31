@@ -54,6 +54,18 @@ first image it found, a draft. It now returns the final image, which has the req
 before the fix, used the draft; the cleanup upscales to 2400 px before thresholding, so they print
 fine, but the prompts were tuned on drafts. Re-running the spike on the final images is pending.
 
+## New styles (2026-10-31)
+
+Two styles, `kawaii` and `mandala`, and an `adult` level (intricate, fine lines; cleanup minimum
+stroke 4 px at 2400 px) were added. Checked on the toucan photo, one conversion each, final 2K
+images (after the draft-image fix): kawaii at 6–8 with *simplify*, mandala at adult with
+*remove*, realistic at adult with *keep*. All three were clean on the first try (no cleanup
+warnings): kawaii gave round shapes, big eyes and a few hearts and stars; mandala filled the
+bird with scales, petals and swirls as closed areas; realistic adult drew the whole forest in
+fine lines. About $0.42.
+
+![Kawaii, mandala and realistic for adults](images/more-styles.jpg)
+
 ## Still open
 
 - **Small subjects.** When the subject fills a small part of the photo (the dogs), the model keeps

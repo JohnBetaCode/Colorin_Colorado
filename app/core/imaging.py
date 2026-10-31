@@ -31,6 +31,18 @@ STYLE_PROMPTS = {
         "expressive eyes when the subject has a face, smooth even outlines, fewer and bigger "
         "areas to color; still unmistakably the same subject as the photo"
     ),
+    "kawaii": (
+        "kawaii: very cute, round and chubby shapes, a big head with large shiny eyes and a small "
+        "smile when the subject has a face, soft rounded outlines, and a few tiny decorations "
+        "around it (little stars, hearts or sparkles) drawn as closed outlines; still "
+        "unmistakably the same subject as the photo"
+    ),
+    "mandala": (
+        "pattern art: the subject's silhouette and main parts stay accurate to the photo, and "
+        "every large area inside them is filled with decorative patterns (scales, petals, "
+        "swirls, circles, small geometric shapes), each pattern piece a closed outlined area to "
+        "color; the background, if any, is plain or a simple pattern"
+    ),
 }
 
 AGE_PROMPTS = {
@@ -55,6 +67,14 @@ AGE_PROMPTS = {
             "leaves drawn as many small outlined areas"
         ),
         "lines": "medium: about 1/200 of the image width, slightly finer for inner details",
+    },
+    "adult": {
+        "detail": (
+            "INTRICATE, for teens and adults who color with fine pens: very detailed, hundreds of "
+            "small areas, every texture (feathers, fur, stones, leaves, fabric) drawn as many small "
+            "outlined areas"
+        ),
+        "lines": "fine: about 1/300 of the image width, even finer for small inner details",
     },
 }
 

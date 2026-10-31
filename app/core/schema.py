@@ -10,12 +10,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Style = Literal["realistic", "cartoon"]
-AgeGroup = Literal["3-5", "6-8", "9+"]
+Style = Literal["realistic", "cartoon", "kawaii", "mandala"]
+AgeGroup = Literal["3-5", "6-8", "9+", "adult"]
 Background = Literal["keep", "simplify", "remove"]
 Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
-Marketplace = Literal["us", "uk", "es"]  # the Amazon store KDP costs and royalties are estimated for
+Marketplace = Literal["us", "uk", "es"]
+Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
 Engine = Literal["gemini", "draft"]
 Status = Literal["pending", "converted", "approved"]
 Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
@@ -30,11 +31,12 @@ License = Literal[
     "unknown", "own", "public_domain", "cc_by", "cc_by_sa", "free_license", "non_commercial", "no_derivatives"
 ]
 
-STYLES: tuple[Style, ...] = ("realistic", "cartoon")
-AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+")
+STYLES: tuple[Style, ...] = ("realistic", "cartoon", "kawaii", "mandala")
+AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+", "adult")
 BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
+TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
 ENGINES: tuple[Engine, ...] = ("gemini", "draft")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
 INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
@@ -86,6 +88,7 @@ class Book(BaseModel):
     title: str
     subtitle: str = ""
     dedication: str = ""
+    template: Template = "free"
     style: Style = "realistic"
     age_group: AgeGroup = "6-8"
     background: Background = "simplify"

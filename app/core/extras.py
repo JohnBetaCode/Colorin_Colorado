@@ -45,11 +45,12 @@ Box = tuple[float, float, float, float]
 
 # --- Word search ------------------------------------------------------------------
 
-GRID_SIZE = {"3-5": 8, "6-8": 11, "9+": 14}
+GRID_SIZE = {"3-5": 8, "6-8": 11, "9+": 14, "adult": 16}
 DIRECTIONS = {
     "3-5": [(0, 1), (1, 0)],
     "6-8": [(0, 1), (1, 0), (1, 1)],
     "9+": [(0, 1), (1, 0), (1, 1), (-1, 1), (0, -1), (-1, 0), (-1, -1), (1, -1)],
+    "adult": [(0, 1), (1, 0), (1, 1), (-1, 1), (0, -1), (-1, 0), (-1, -1), (1, -1)],
 }
 MIN_WORDS = 3
 MAX_WORDS = 12
@@ -107,7 +108,7 @@ def word_search(words: list[str], age_group: str, language: str, seed: str) -> W
 
 # --- Maze ------------------------------------------------------------------------
 
-MAZE_SIZE = {"3-5": (6, 8), "6-8": (10, 13), "9+": (16, 21)}  # columns, rows
+MAZE_SIZE = {"3-5": (6, 8), "6-8": (10, 13), "9+": (16, 21), "adult": (22, 29)}  # columns, rows
 
 
 @dataclass
@@ -161,7 +162,7 @@ def maze(age_group: str, seed: str) -> Maze:
 
 # --- Connect the dots ---------------------------------------------------------------
 
-DOT_COUNT = {"3-5": 12, "6-8": 24, "9+": 40}
+DOT_COUNT = {"3-5": 12, "6-8": 24, "9+": 40, "adult": 60}
 
 
 @dataclass
@@ -372,7 +373,7 @@ def draw_maze(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     bottom = _heading(c, book, fonts, box, "pdf.maze", "pdf.maze_hint")
     label_h = 0.35 * inch
     area = (x, y + label_h, w, bottom - y - 2 * label_h)
-    _maze_lines(c, puzzle, area, solved=False, line_width={"3-5": 4, "6-8": 3, "9+": 2}[book.age_group])
+    _maze_lines(c, puzzle, area, solved=False, line_width={"3-5": 4, "6-8": 3, "9+": 2, "adult": 1.5}[book.age_group])
     cell = min(area[2] / puzzle.cols, area[3] / puzzle.rows)
     left = x + (w - cell * puzzle.cols) / 2
     c.setFillColor(INK)
@@ -402,7 +403,7 @@ def draw_dots(c: Canvas, book: Book, page_list: list[Page], fonts: Fonts, box: B
     height = puzzle.image.height
     cx = sum(p[0] for p in puzzle.points) / len(puzzle.points)
     cy = sum(p[1] for p in puzzle.points) / len(puzzle.points)
-    size = {"3-5": 14, "6-8": 11, "9+": 9}[book.age_group]
+    size = {"3-5": 14, "6-8": 11, "9+": 9, "adult": 8}[book.age_group]
     c.setFillColor(INK)
     c.setFont(fonts.bold, size)
     for n, (px, py) in enumerate(puzzle.points, start=1):

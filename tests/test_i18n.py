@@ -19,6 +19,7 @@ from app.core.schema import (
     PAGE_SIZES,
     STATUSES,
     STYLES,
+    TEMPLATES,
 )
 
 APP = Path(__file__).resolve().parents[1] / "app"
@@ -61,6 +62,9 @@ def test_every_option_and_warning_has_a_label():
         "license": LICENSES,
         "extra": EXTRAS,
         "marketplace": MARKETPLACES,
+        "template": TEMPLATES,
+        "template_subtitle": TEMPLATES,
+        "template_labels": [k for k in TEMPLATES if k != "free"],
         "export.extra_missing": ("word_search", "dots", "solutions"),
     }
     missing = [f"{p}.{v}" for p, values in prefixes.items() for v in values if f"{p}.{v}" not in STRINGS]

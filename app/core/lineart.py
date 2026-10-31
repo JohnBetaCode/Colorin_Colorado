@@ -19,12 +19,12 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-AGE_GROUPS = ("3-5", "6-8", "9+")
+AGE_GROUPS = ("3-5", "6-8", "9+", "adult")
 
 # Work resolution: the long side of every cleaned page. A coloring page prints about
 # 7.5 in on its long side, so 2400 px is ~320 DPI and 13 px is ~1 mm.
 WORK_SIZE = 2400
-MIN_STROKE_PX = {"3-5": 16, "6-8": 10, "9+": 6}
+MIN_STROKE_PX = {"3-5": 16, "6-8": 10, "9+": 6, "adult": 4}
 
 # Ink is anything darker than this (or Otsu's threshold, if lower), so light gray
 # shading drops out instead of turning into black blobs. Saturated pixels are color
@@ -46,7 +46,7 @@ FILL_MIN_AREA = 0.002
 THICKEN_MAX_BLACK = 0.22
 THICKEN_MAX_LOST = 2
 THICKEN_LOST_SHARE = 0.15
-THICKEN_REGION_AREA = {"3-5": 0.004, "6-8": 0.002, "9+": 0.0005}
+THICKEN_REGION_AREA = {"3-5": 0.004, "6-8": 0.002, "9+": 0.0005, "adult": 0.0002}
 
 # A raw image whose outer strip is mostly not white paper is a photo of a printed
 # page (a "mockup"): keep only the sheet of paper.
@@ -246,8 +246,8 @@ def clean(data: bytes | Image.Image, age_group: str) -> CleanResult:
 # and the borders between areas become the lines, so every area is closed and can be
 # colored. Fewer colors and smoother borders for younger kids and for cartoon style.
 DRAFT_SIZE = 700
-_DRAFT_COLORS = {"3-5": 6, "6-8": 10, "9+": 14}
-_DRAFT_SMOOTH = {"3-5": 11, "6-8": 9, "9+": 7}
+_DRAFT_COLORS = {"3-5": 6, "6-8": 10, "9+": 14, "adult": 18}
+_DRAFT_SMOOTH = {"3-5": 11, "6-8": 9, "9+": 7, "adult": 5}
 
 
 def draft(photo: bytes | Image.Image, style: str, age_group: str) -> Image.Image:

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import books, gemini, i18n, pages, usage
+from app.core import books, gemini, i18n, pages, templates, usage
 from app.core.config import AUTH_METHODS, LANGUAGES, get_settings, save_settings
 from app.core.i18n import LANGUAGE_NAMES, t
-from app.core.schema import AGE_GROUPS, STYLES
+from app.core.schema import AGE_GROUPS, STYLES, TEMPLATES
 from app.ui.common import flash, language_switch, seed, show_flash
 
 
@@ -99,6 +99,9 @@ def _render_create_form() -> None:
     with st.form("create_book", clear_on_submit=True):
         title = st.text_input(t("book.title"), placeholder=t("home.title_placeholder"))
         subtitle = st.text_input(t("book.subtitle"), placeholder=t("home.subtitle_placeholder"))
+        template = st.selectbox(
+            t("book.template"), TEMPLATES, format_func=lambda k: t(f"template.{k}"), help=t("book.template_help")
+        )
         col1, col2, col3 = st.columns(3)
         style = col1.selectbox(t("book.style"), STYLES, format_func=lambda s: t(f"style.{s}"))
         age_group = col2.selectbox(t("book.age_group"), AGE_GROUPS, index=1, format_func=lambda a: t(f"age.{a}"))
@@ -115,7 +118,15 @@ def _render_create_form() -> None:
         if not title.strip():
             st.error(t("home.title_required"))
         else:
-            book = books.create_book(title, subtitle=subtitle.strip(), style=style, age_group=age_group, language=language)
+            book = books.create_book(
+                title,
+                subtitle=subtitle.strip(),
+                template=template,
+                background=templates.BACKGROUND[template],
+                style=style,
+                age_group=age_group,
+                language=language,
+            )
             _open_book(book.slug)
             st.rerun()
 

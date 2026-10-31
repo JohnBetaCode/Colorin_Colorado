@@ -7,7 +7,7 @@ import streamlit as st
 from app.core import books, pages, usage
 from app.core.config import LANGUAGES
 from app.core.i18n import LANGUAGE_NAMES, t
-from app.core.schema import AGE_GROUPS, BACKGROUNDS, STYLES, Book
+from app.core.schema import AGE_GROUPS, BACKGROUNDS, STYLES, TEMPLATES, Book
 from app.ui import export_panel, kdp_panel, pages_grid, workbench
 from app.ui.common import flash, language_switch, seed, show_flash
 
@@ -31,7 +31,7 @@ def _render_sidebar(book: Book) -> None:
         if spend["calls"]:
             st.caption(t("book.spend", cost=spend["cost_usd"], images=spend["images"], tokens=spend["tokens"]))
 
-        fields = ("title", "subtitle", "dedication", "style", "age_group", "background", "language")
+        fields = ("title", "subtitle", "dedication", "template", "style", "age_group", "background", "language")
         for field in fields:
             seed(f"edit_{field}_{book.slug}", getattr(book, field))
         seed(f"edit_second_language_{book.slug}", book.second_language or NO_SECOND_LANGUAGE)
@@ -41,6 +41,13 @@ def _render_sidebar(book: Book) -> None:
                 title = st.text_input(t("book.title"), key=key("title"))
                 subtitle = st.text_input(t("book.subtitle"), key=key("subtitle"))
                 dedication = st.text_area(t("book.dedication"), height=80, key=key("dedication"))
+                template = st.selectbox(
+                    t("book.template"),
+                    TEMPLATES,
+                    format_func=lambda k: t(f"template.{k}"),
+                    help=t("book.template_help"),
+                    key=key("template"),
+                )
                 style = st.selectbox(t("book.style"), STYLES, format_func=lambda s: t(f"style.{s}"), key=key("style"))
                 age_group = st.selectbox(
                     t("book.age_group"), AGE_GROUPS, format_func=lambda a: t(f"age.{a}"), key=key("age_group")
@@ -69,6 +76,7 @@ def _render_sidebar(book: Book) -> None:
                     book.title = title.strip() or book.title
                     book.subtitle = subtitle.strip()
                     book.dedication = dedication.strip()
+                    book.template = template
                     book.style, book.age_group, book.background, book.language = style, age_group, background, language
                     book.second_language = None if second_language in (NO_SECOND_LANGUAGE, language) else second_language
                     books.save_book(book)
