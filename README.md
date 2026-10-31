@@ -52,6 +52,9 @@ the right. Crop, convert, regenerate with instructions, approve, next.
 The [setup guide](docs/setup.md) gets it running with Docker in a few minutes, then open
 http://localhost:8502 and create your first book.
 
+The `SAM` branch adds background removal for mystery mosaics with SAM2, offline; see
+[branches](docs/setup.md#branches).
+
 ## Learn more
 
 - [Features](docs/features.md): everything the app does, and what building it cost.

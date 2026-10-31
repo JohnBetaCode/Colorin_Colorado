@@ -30,6 +30,25 @@ The container runs as your host user (`UID`/`GID`, default 1000), so `books/` an
 owned by you. If your user id is not 1000, start it with `UID=$(id -u) GID=$(id -g) docker
 compose up -d`.
 
+## Branches
+
+| Branch | What it has | Docker image |
+|---|---|---|
+| `main` | Everything: AI and draft engines, mystery mosaics, PDF and Amazon KDP files. | Smaller, quicker to build |
+| `SAM` | `main` plus **background removal for mosaics with SAM2**, offline: it keeps only the subject (the bird) and leaves the background white. PyTorch (CPU) is installed in the image and the SAM2 model (about 320 MB, public, no account needed) downloads by itself the first time into `models/`. | About 2.3 GB |
+
+Use `main` unless you want background removal. To switch, change the branch and rebuild the
+image, since the two have different requirements:
+
+```bash
+git switch SAM        # or: git switch main
+mkdir -p books data models
+docker compose up -d --build
+```
+
+Books are shared between branches. A mosaic page saved with "Remove the background" on `SAM`
+still exports on `main`; converting it again there ignores that option.
+
 ## Configuration
 
 Settings live in `config/.env` (git-ignored). The **⚙️ Settings** panel on the home page edits
