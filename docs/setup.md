@@ -19,6 +19,8 @@ Without any of them the app still runs: the free draft engine converts photos of
 git clone git@github.com:JohnBetaCode/Colorin_Colorado.git
 cd Colorin_Colorado
 cp config/.env.example config/.env   # then set the project or an API key, or do it from the app
+# Only with Google Cloud credentials (GEMINI_AUTH=adc): mount them into the container
+cp docker-compose.override.example.yml docker-compose.override.yml
 docker compose up -d --build
 ```
 
@@ -45,9 +47,10 @@ them and can test the connection; **Save & test** sends one cheap text request.
 | `UI_LANGUAGE` | `es` | App language, `es` or `en`. Also switchable from the sidebar. |
 
 Credentials are never copied into the image: `.dockerignore` keeps `config/.env` (project ID, API
-key) and the user data out of it, Compose mounts `config/` and
-`~/.config/gcloud/application_default_credentials.json` at run time, and `config/.env` is
-git-ignored.
+key) and the user data out of it, and Compose mounts `config/` at run time. The gcloud credentials
+file is mounted only by `docker-compose.override.yml`, which you copy from
+`docker-compose.override.example.yml` when you use `adc` (the `run-app` script does it for you
+when the file exists). Both `config/.env` and the override are git-ignored.
 
 ## Data
 
@@ -71,11 +74,12 @@ read the PDF back and check that every coloring page is pure black and white.
 
 - **"Gemini is not configured"**: in **⚙️ Settings**, set the project ID (Google Cloud) or the API
   key (the two API key methods).
-- **Using an API key and no gcloud**: Compose still mounts
-  `~/.config/gcloud/application_default_credentials.json`; if that file does not exist, Docker
-  creates an empty folder with that name on the host. It does no harm to the app, but delete it
-  before running `gcloud auth application-default login` later, or gcloud cannot write the file.
-  You can also remove that line from `docker-compose.yml`.
+- **`DefaultCredentialsError` with `adc` although gcloud is logged in**: the credentials are not
+  mounted. Copy `docker-compose.override.example.yml` to `docker-compose.override.yml` and
+  `docker compose up -d`.
+- **An empty folder named `application_default_credentials.json`** in `~/.config/gcloud` (left by an
+  older version of this setup, which mounted the file even when it did not exist): delete it before
+  running `gcloud auth application-default login`.
 - **401/403 or `DefaultCredentialsError`**: run `gcloud auth application-default login` on the
   host, then `docker compose restart app`.
 - **404 / model not found**: wrong model name or region; image models need `global`.

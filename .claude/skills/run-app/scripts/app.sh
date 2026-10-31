@@ -20,6 +20,15 @@ health() {
   if [ "$code" = "200" ]; then echo "HTTP health: OK ($URL)"; else echo "HTTP health: not responding (code: ${code:-none})"; fi
 }
 
+# Google Cloud credentials are mounted by docker-compose.override.yml (git-ignored). Create it
+# from the example when the host has the credentials file and the override does not exist yet.
+adc_override() {
+  if [ ! -f docker-compose.override.yml ] && [ -f "$HOME/.config/gcloud/application_default_credentials.json" ]; then
+    cp docker-compose.override.example.yml docker-compose.override.yml
+    echo "Created docker-compose.override.yml to mount your gcloud credentials."
+  fi
+}
+
 wait_healthy() {
   for _ in $(seq 1 30); do
     if curl -s -o /dev/null --max-time 2 "$URL/_stcore/health"; then break; fi
@@ -34,13 +43,16 @@ case "${1:-status}" in
     health
     ;;
   up)
+    adc_override
     docker compose up -d --build
     wait_healthy
     ;;
   test)
+    adc_override
     docker compose run --rm --no-deps app python -m pytest -p no:cacheprovider -q tests
     ;;
   rebuild)
+    adc_override
     docker compose build --no-cache app
     docker compose up -d
     wait_healthy

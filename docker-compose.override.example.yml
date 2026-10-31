@@ -1,0 +1,11 @@
+# Google Cloud credentials for GEMINI_AUTH=adc (gcloud auth application-default login).
+# Compose loads docker-compose.override.yml automatically, and git ignores it:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+# .claude/skills/run-app/scripts/app.sh does it for you when the credentials file exists.
+# Not needed with an API key (GEMINI_AUTH=vertex_key or studio_key).
+services:
+  app:
+    volumes:
+      - ~/.config/gcloud/application_default_credentials.json:/gcloud/adc.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcloud/adc.json
