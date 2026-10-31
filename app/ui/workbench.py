@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import export, gemini, imaging, pages
+from app.core import commons, export, gemini, imaging, pages
 from app.core.config import get_settings
 from app.core.i18n import t
-from app.core.schema import BACKGROUNDS, STYLES, Book, Crop, Engine, Page
+from app.core.schema import BACKGROUNDS, LICENSES, STYLES, Book, Crop, Engine, Page
 from app.ui.common import flash, seed
 
 MIN_CROP = 10  # percent of the photo on each axis
@@ -37,6 +37,19 @@ def _save_crop(slug: str, page_id: str) -> None:
     top, bottom = st.session_state[f"crop_y_{page_id}"]
     if right - left >= MIN_CROP and bottom - top >= MIN_CROP:
         pages.set_crop(slug, page_id, Crop(left=left / 100, top=top / 100, right=right / 100, bottom=bottom / 100))
+
+
+def _fill_from_commons(slug: str, page_id: str) -> None:
+    try:
+        photo = commons.lookup(st.session_state[f"source_url_{page_id}"])
+    except commons.CommonsError as exc:
+        flash("error", t("wb.commons_failed", error=exc))
+        return
+    pages.update_page(slug, page_id, credit=photo.credit, license=photo.license, source_url=photo.page_url)
+    st.session_state[f"credit_{page_id}"] = photo.credit
+    st.session_state[f"license_{page_id}"] = photo.license
+    st.session_state[f"source_url_{page_id}"] = photo.page_url
+    flash("success", t("wb.commons_filled"))
 
 
 def _reset_crop(slug: str, page_id: str) -> None:
@@ -127,14 +140,41 @@ def _render_caption(book: Book, page: Page) -> None:
     )
     if not export.caption_fits(book, page):
         st.warning(t("wb.caption_too_long"))
+    col1, col2 = st.columns(2)
     seed(f"credit_{page.id}", page.credit)
-    st.text_input(
+    col1.text_input(
         t("wb.credit"),
         placeholder=t("wb.credit_placeholder"),
         help=t("wb.credit_help"),
         key=f"credit_{page.id}",
         on_change=_save_field,
         args=(book.slug, page.id, "credit"),
+    )
+    seed(f"license_{page.id}", page.license)
+    col2.selectbox(
+        t("wb.license"),
+        LICENSES,
+        format_func=lambda license: t(f"license.{license}"),
+        help=t("wb.license_help"),
+        key=f"license_{page.id}",
+        on_change=_save_field,
+        args=(book.slug, page.id, "license"),
+    )
+    col1, col2 = st.columns([3, 2], vertical_alignment="bottom")
+    seed(f"source_url_{page.id}", page.source_url)
+    col1.text_input(
+        t("wb.source_url"),
+        placeholder=t("wb.source_url_placeholder"),
+        key=f"source_url_{page.id}",
+        on_change=_save_field,
+        args=(book.slug, page.id, "source_url"),
+    )
+    col2.button(
+        t("wb.commons_fill"),
+        key=f"commons_{page.id}",
+        width="stretch",
+        on_click=_fill_from_commons,
+        args=(book.slug, page.id),
     )
 
 

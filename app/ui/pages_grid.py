@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
-from app.core import books, imaging, pages
+from app.core import books, commons, imaging, pages
 from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import Book, Page
@@ -48,6 +48,21 @@ def _render_uploader(book: Book, expanded: bool) -> None:
                 flash("warning", t("pages.unreadable", names=", ".join(failed)))
             else:
                 flash("success", t("pages.added", n=len(files)))
+            st.rerun()
+        col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
+        url = col1.text_input(
+            t("pages.commons"),
+            placeholder=t("wb.source_url_placeholder"),
+            key=f"commons_url_{st.session_state.get('upload_round', 0)}",
+        )
+        if col2.button(t("pages.commons_add"), width="stretch") and url.strip():
+            try:
+                page = commons.add_page(book.slug, url)
+            except (commons.CommonsError, ValueError) as exc:
+                st.error(t("wb.commons_failed", error=exc))
+                return
+            st.session_state.upload_round = st.session_state.get("upload_round", 0) + 1
+            flash("success", t("pages.commons_added", name=page.original_name, license=t(f"license.{page.license}")))
             st.rerun()
 
 

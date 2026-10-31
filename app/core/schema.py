@@ -21,6 +21,10 @@ Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior
 CoverColor = Literal["blue", "green", "orange", "purple", "pink", "teal"]
 ArtMode = Literal["collage", "text", "theme"]  # what an AI cover image is drawn from
 ArtSource = Literal["upload", "collage", "text", "theme"]
+# Photo licenses, by what they allow in a book for sale (see docs/amazon-kdp.md).
+License = Literal[
+    "unknown", "own", "public_domain", "cc_by", "cc_by_sa", "free_license", "non_commercial", "no_derivatives"
+]
 
 STYLES: tuple[Style, ...] = ("realistic", "cartoon")
 AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+")
@@ -32,6 +36,11 @@ INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
 COVER_COLORS: tuple[CoverColor, ...] = ("blue", "green", "orange", "purple", "pink", "teal")
 ART_MODES: tuple[ArtMode, ...] = ("collage", "text", "theme")
 ART_SOURCES: tuple[ArtSource, ...] = ("upload", "collage", "text", "theme")
+LICENSES: tuple[License, ...] = (
+    "unknown", "own", "public_domain", "cc_by", "cc_by_sa", "free_license", "non_commercial", "no_derivatives"
+)
+LICENSES_NOT_FOR_SALE: tuple[License, ...] = ("non_commercial", "no_derivatives")
+LICENSES_WITH_CREDIT: tuple[License, ...] = ("cc_by", "cc_by_sa")  # the credit must be printed
 
 
 class CoverArt(BaseModel):
@@ -105,6 +114,8 @@ class Page(BaseModel):
     subtitle: str = ""
     info: str = ""
     credit: str = ""  # who took the photo and its license, printed on the copyright page
+    license: License = "unknown"
+    source_url: str = ""  # where the photo comes from, e.g. its Wikimedia Commons page
     style: Style | None = None  # None: the book's style
     background: Background | None = None  # None: the book's background
     instructions: str = ""

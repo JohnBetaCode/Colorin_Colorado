@@ -257,6 +257,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "The text does not fit in the box and will be cut in the PDF. Shorten it a little.",
     },
     "wb.credit": {"es": "Crédito de la foto", "en": "Photo credit"},
+    "wb.license": {"es": "Licencia de la foto", "en": "Photo license"},
+    "wb.license_help": {
+        "es": "Para vender el libro, cada foto tiene que permitir uso comercial y obras derivadas: una página para colorear es una obra derivada de la foto.",
+        "en": "To sell the book, every photo must allow commercial use and derivatives: a coloring page is a derivative of the photo.",
+    },
+    "wb.source_url": {"es": "Enlace de la foto (opcional)", "en": "Photo link (optional)"},
+    "wb.source_url_placeholder": {"es": "https://commons.wikimedia.org/wiki/File:…", "en": "https://commons.wikimedia.org/wiki/File:…"},
+    "wb.commons_fill": {"es": "🔎 Llenar desde Wikimedia Commons", "en": "🔎 Fill from Wikimedia Commons"},
+    "wb.commons_filled": {"es": "Crédito y licencia tomados de Wikimedia Commons.", "en": "Credit and license taken from Wikimedia Commons."},
+    "wb.commons_failed": {"es": "No se pudo leer Wikimedia Commons: {error}", "en": "Could not read Wikimedia Commons: {error}"},
+    "license.unknown": {"es": "Sin definir", "en": "Not set"},
+    "license.own": {"es": "Foto propia", "en": "My own photo"},
+    "license.public_domain": {"es": "Dominio público o CC0", "en": "Public domain or CC0"},
+    "license.cc_by": {"es": "CC BY (con crédito)", "en": "CC BY (credit required)"},
+    "license.cc_by_sa": {"es": "CC BY-SA (con crédito; los dibujos quedan CC BY-SA)", "en": "CC BY-SA (credit; drawings become CC BY-SA)"},
+    "license.free_license": {"es": "Libre para uso comercial (Pexels, Unsplash…)", "en": "Free for commercial use (Pexels, Unsplash…)"},
+    "license.non_commercial": {"es": "No comercial (NC): no se puede vender", "en": "Non-commercial (NC): cannot be sold"},
+    "license.no_derivatives": {"es": "Sin derivadas (ND): no se puede vender", "en": "No derivatives (ND): cannot be sold"},
     "wb.credit_placeholder": {"es": "p. ej. Foto propia · Bernard Gagnon, CC0", "en": "e.g. My own photo · Bernard Gagnon, CC0"},
     "wb.credit_help": {
         "es": "Quién tomó la foto y con qué licencia. Sale en la página legal del PDF; para vender el libro necesitas el derecho de usar cada foto.",
@@ -266,6 +284,9 @@ STRINGS: dict[str, dict[str, str]] = {
     # Pages
     "pages.add_photos": {"es": "📷 Agregar fotos", "en": "📷 Add photos"},
     "pages.upload_label": {"es": "Fotos (JPG, PNG, WebP o HEIC)", "en": "Photos (JPG, PNG, WebP or HEIC)"},
+    "pages.commons": {"es": "O una foto de Wikimedia Commons, con su crédito y licencia", "en": "Or a photo from Wikimedia Commons, with its credit and license"},
+    "pages.commons_add": {"es": "🌐 Agregar desde Commons", "en": "🌐 Add from Commons"},
+    "pages.commons_added": {"es": "Se agregó «{name}» ({license}).", "en": "Added “{name}” ({license})."},
     "pages.add_n": {"es": "Agregar {n} fotos", "en": "Add {n} photos"},
     "pages.added": {"es": "Se agregaron {n} fotos.", "en": "Added {n} photos."},
     "pages.unreadable": {"es": "No se pudieron leer: {names}", "en": "Could not read: {names}"},
@@ -401,8 +422,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "The copyright page text is missing (© year and author, rights, ISBN). Write it in 📄 Export PDF.",
     },
     "kdp.issue.missing_credits": {
-        "es": "Sin crédito de la foto: {names}. Escribe en la mesa de trabajo de quién es cada foto y su licencia.",
-        "en": "No photo credit: {names}. In the workbench, write who owns each photo and its license.",
+        "es": "Su licencia exige el crédito y no lo tienen: {names}. Escríbelo en la mesa de trabajo.",
+        "en": "Their license requires a credit and they have none: {names}. Write it in the workbench.",
+    },
+    "kdp.issue.license_not_for_sale": {
+        "es": "Su licencia no permite venderlas (NC o ND): {names}. Cambia esas fotos o sácalas del libro.",
+        "en": "Their license does not allow selling them (NC or ND): {names}. Replace those photos or leave them out.",
+    },
+    "kdp.issue.license_unknown": {
+        "es": "Sin licencia definida: {names}. Elige en la mesa de trabajo de dónde viene cada foto.",
+        "en": "No license set: {names}. In the workbench, pick where each photo comes from.",
+    },
+    "kdp.issue.share_alike": {
+        "es": "Fotos CC BY-SA: {names}. Los dibujos hechos de ellas quedan bajo CC BY-SA y cualquiera puede copiarlos.",
+        "en": "CC BY-SA photos: {names}. The drawings made from them are CC BY-SA too, and anyone may copy them.",
     },
     "kdp.issue.low_royalty": {
         "es": "Por debajo de ${threshold:.2f} KDP paga el 50% en vez del 60%.",

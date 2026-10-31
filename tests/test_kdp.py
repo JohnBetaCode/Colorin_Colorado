@@ -5,14 +5,14 @@ from app.core import books, cover, export, kdp, lineart, pages
 from app.core.schema import Version
 
 
-def _book(photo, line_art, n_pages, credit="", **book_fields):
+def _book(photo, line_art, n_pages, credit="", license="unknown", **book_fields):
     book = books.create_book("Aves del jardín", subtitle="Para colorear", **book_fields)
     clean = lineart.clean(line_art, "6-8").image
     for i in range(n_pages):
         page = pages.add_photo(book.slug, f"ave-{i}.png", photo)
         version = Version(n=0, engine="draft", style="realistic", age_group="6-8", background="simplify", created_at="now")
         pages.add_version(book.slug, page.id, version, line_art, clean)
-        pages.update_page(book.slug, page.id, title=f"Ave {i + 1}", credit=credit, status="approved")
+        pages.update_page(book.slug, page.id, title=f"Ave {i + 1}", credit=credit, license=license, status="approved")
     return books.load_book(book.slug)
 
 
@@ -51,13 +51,13 @@ def test_review_of_a_small_unfinished_book(photo, line_art):
     assert review.pages == 5  # title, owner page, three coloring pages
     issues = _issues(review)
     assert issues["too_few_pages_no_backs"] == "error"
-    assert issues["no_blank_backs"] == issues["no_legal"] == issues["missing_credits"] == "warning"
+    assert issues["no_blank_backs"] == issues["no_legal"] == issues["license_unknown"] == "warning"
     assert "ai_disclosure" not in issues  # draft pages only
     assert not review.ready
 
 
 def test_review_of_a_book_ready_for_kdp(photo, line_art):
-    book = _book(photo, line_art, 10, credit="Foto propia", blank_backs=True, legal="© 2026 Ana. Todos los derechos reservados.")
+    book = _book(photo, line_art, 10, credit="Foto propia", license="own", blank_backs=True, legal="© 2026 Ana. Todos los derechos reservados.")
     review = kdp.review(book)
     assert review.pages == 24  # title, copyright page, owner page + blank, 10 sheets + blank backs
     assert review.cost == 2.84 and review.royalty == 3.15
@@ -96,3 +96,15 @@ def test_spine_title_only_on_thick_books(photo, line_art):
     thick = _book(photo, line_art, 50, blank_backs=True)
     text = PdfReader(cover.export_cover_pdf(thick)).pages[0].extract_text()
     assert text.count("Aves del jardín") == 2  # front cover and spine
+
+
+def test_review_blocks_photos_that_cannot_be_sold(photo, line_art):
+    book = _book(photo, line_art, 2, license="cc_by")
+    page_list = pages.load_pages(book.slug)
+    pages.update_page(book.slug, page_list[1].id, license="non_commercial")
+    issues = {i.key: i for i in kdp.review(book).issues}
+    assert issues["license_not_for_sale"].level == "error" and issues["license_not_for_sale"].params["names"] == "Ave 2"
+    assert issues["missing_credits"].params["names"] == "Ave 1"  # CC BY needs its credit
+    pages.update_page(book.slug, page_list[1].id, license="cc_by_sa", credit="Ana, CC BY-SA 4.0")
+    issues = {i.key: i for i in kdp.review(book).issues}
+    assert "license_not_for_sale" not in issues and issues["share_alike"].params["names"] == "Ave 2"

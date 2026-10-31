@@ -15,7 +15,7 @@ from typing import Literal
 from PIL import Image
 
 from app.core import cover_art, export
-from app.core.schema import Book, Ink, Page, PageSize
+from app.core.schema import LICENSES_NOT_FOR_SALE, LICENSES_WITH_CREDIT, Book, Ink, Page, PageSize
 
 TRIM: dict[PageSize, tuple[float, float]] = {"letter": (8.5, 11.0), "a4": (8.27, 11.69)}  # inches
 BLEED = 0.125  # inches added to the top, bottom and outside edges of the cover
@@ -152,6 +152,9 @@ def review(book: Book) -> Review:
         add("error", "too_few_pages" if book.blank_backs else "too_few_pages_no_backs", pages=pages, min=page_range[0])
     if pages > MAX_PAGES:
         add("error", "too_many_pages", pages=pages, max=MAX_PAGES)
+    not_for_sale = [p for p in report.included if p.license in LICENSES_NOT_FOR_SALE]
+    if not_for_sale:
+        add("error", "license_not_for_sale", names=_names(not_for_sale))
     if not export.fonts_embedded():
         add("error", "fonts")
     if lowest is not None and book.list_price < lowest:
@@ -164,9 +167,15 @@ def review(book: Book) -> Review:
         add("warning", "overflowing", names=_names(report.overflowing))
     if not book.legal.strip():
         add("warning", "no_legal")
-    without_credit = [p for p in report.included if not p.credit.strip()]
+    unknown = [p for p in report.included if p.license == "unknown"]
+    if unknown:
+        add("warning", "license_unknown", names=_names(unknown))
+    without_credit = [p for p in report.included if p.license in LICENSES_WITH_CREDIT and not p.credit.strip()]
     if without_credit:
         add("warning", "missing_credits", names=_names(without_credit))
+    share_alike = [p for p in report.included if p.license == "cc_by_sa"]
+    if share_alike:
+        add("info", "share_alike", names=_names(share_alike))
     if cost is not None and book.list_price < ROYALTY_THRESHOLD:
         add("info", "low_royalty", threshold=ROYALTY_THRESHOLD)
     art = cover_art.selected(book)
