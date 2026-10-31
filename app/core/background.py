@@ -139,7 +139,9 @@ def subject_mask(slug: str, page: Page, settings: MosaicSettings) -> np.ndarray:
             return np.asarray(cached.convert("L")) > 127
     if not available():
         raise BackgroundError("SAM2 is not installed: rebuild the Docker image.")
-    photo = pages.cropped_photo(slug, page)
+    # Without the tone curve: the subject is the same however the tones are set, so moving
+    # the curve never runs SAM2 again (and the cache key needs no curve).
+    photo = pages.cropped_photo(slug, page, curve=False)
     w, h = photo.size
 
     def pixels(p: SubjectPoint) -> tuple[float, float]:

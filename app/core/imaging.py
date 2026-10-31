@@ -191,7 +191,7 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
         grid, settings = mosaic_draft(book, page)
         version = Version(
             n=0, engine=engine, style=style, age_group=book.age_group, background=background,
-            mosaic=settings, created_at=now(),
+            mosaic=settings, curve=page.curve, created_at=now(),
         )
         return Rendered(page, mosaic.grid_png(grid), version, mosaic.render_solution(grid, settings))
     photo = pages.cropped_photo(book.slug, page)
@@ -209,6 +209,7 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
         age_group=book.age_group,
         background=background,
         instructions=page.instructions,
+        curve=page.curve,
         warnings=cleaned.warnings,
         created_at=now(),
     )

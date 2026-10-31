@@ -98,6 +98,14 @@ def test_clicks_add_points_keep_the_middle_and_remove_the_point_clicked():
     assert points == [SubjectPoint(x=20, y=55), SubjectPoint(x=40, y=90, subject=False)]
 
 
+def test_the_tone_curve_does_not_cut_again(fake_sam):
+    book, page = _page(png_bytes(_bird_on_grass()))
+    background.subject_mask(book.slug, page, page.mosaic)
+    page = pages.update_page(book.slug, page.id, curve=[(0, 0), (128, 200), (255, 255)])
+    background.subject_mask(book.slug, page, page.mosaic)
+    assert len(fake_sam) == 1  # same mask, from the cache
+
+
 def test_a_point_saved_before_clicks_still_loads():
     old = MosaicSettings.model_validate({"remove_background": True, "subject_x": 30, "subject_y": 60})
     assert old.points == [SubjectPoint(x=30, y=60)]

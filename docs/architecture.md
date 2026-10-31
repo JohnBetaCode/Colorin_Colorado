@@ -40,7 +40,8 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
 | `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three AI calls at a time, stored from the calling thread). |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
-| `core/background.py` | Background removal for mosaics with SAM2 (2.1 base-plus through `transformers`, CPU): `subject_mask` (the object under the subject point, cleaned, cached in `masks/`), `outline` (the check image), `available`/`model_downloaded`. Imports torch only when a mask is computed. |
+| `core/tones.py` | Tone curves for a page's photo, like GIMP's Curves: `lut` (control points joined by a monotone cubic, flat beyond the end points, which are the black and white points), `apply`, `histogram` for the editor, `PRESETS`. |
+| `core/background.py` | Background removal for mosaics with SAM2 (2.1 base-plus through `transformers`, CPU): `subject_mask` (the subject from the author's points, cleaned, cached in `masks/`; computed on the photo without its tone curve, so moving the curve never cuts again), `clicked`, `outline` (the check image), `available`/`model_downloaded`. Imports torch only when a mask is computed. |
 | `core/mosaic.py` | Mystery mosaics, the third engine: `make_grid` (photo → tones per cell or triangle), `render_solution` (1-bit), and the vector drawing of the puzzle, its legend and the solution. Settings per age group, book or page (`settings_for`). |
 | `core/export.py` | `preflight` (what the PDF will contain, captions that overflow, extras the pages cannot make), `sheets` (every interior page in print order) and `export_book_pdf`. |
 | `core/extras.py` | The extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page. Generated, never drawn by the AI, seeded with the book id; `available` says which ones the pages can make. |
@@ -86,7 +87,10 @@ id, not slug, because a deleted book's slug can be reused.
 
 ### Conversion (`imaging.convert_page`)
 
-1. Crop the original photo (`pages.cropped_photo`).
+1. Crop the original photo and apply its tone curve, if any (`pages.cropped_photo`; the curve is
+   `Page.curve`, stored as points and never baked into the photo, and recorded on each version).
+   The workbench edits it next to the crop with a static HTML component (`ui/curve_editor.py`):
+   click adds a point, drag moves it, right click or double click removes it.
 2. **AI engine**: build the prompt from the style, the age group, the background, the page title
    (it names the subject) and the author's instructions; send the photo as the reference image
    with the closest supported aspect ratio (`3:4`, `1:1`, `4:3`) at `2K` (1792 × 2400 for `3:4`).
