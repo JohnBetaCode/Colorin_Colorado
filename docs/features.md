@@ -14,6 +14,8 @@ part.
 - **Tone curves** on each photo, like GIMP's Curves, with the histogram behind and before/after
   previews: they shape every conversion (a mosaic depends a lot on them) and the original photo
   stays untouched.
+- **Color grouping** after the curve, with mean shift and a single bandwidth: texture turns into
+  flat areas, so the mosaic and the draft see shapes.
 - **Versions, never lost.** Every conversion is kept; pick the one you like, and delete the ones
   you don't want (after a confirmation).
 - **A free draft mode** to lay out a book before spending anything.

@@ -246,6 +246,28 @@ STRINGS: dict[str, dict[str, str]] = {
         "es": "Detrás, el histograma de la foto. **Clic**: añade un punto. **Arrastra** para moverlo. **Clic derecho** o **doble clic**: lo quita. Los extremos son el punto negro y el blanco: muévelos hacia dentro para más contraste. Para ver el efecto en el mosaico, mira su vista previa.",
         "en": "Behind, the photo's histogram. **Click**: add a point. **Drag** to move it. **Right click** or **double click**: remove it. The ends are the black and white points: move them inwards for more contrast. To see the effect on the mosaic, look at its preview.",
     },
+    "wb.group": {"es": "🧩 Agrupar", "en": "🧩 Group"},
+    "wb.group_help": {
+        "es": "Une los colores parecidos en zonas planas (mean shift), después de la curva, para que el mosaico, el borrador y la IA vean formas y no textura. La foto de referencia del PDF no se agrupa.",
+        "en": "Merges similar colors into flat areas (mean shift), after the curve, so the mosaic, the draft and the AI see shapes rather than texture. The PDF's reference photo is not grouped.",
+    },
+    "wb.group_editor_help": {
+        "es": "Mean shift une cada píxel con sus vecinos de color parecido. El **ancho de banda** dice cuánto pueden diferir dos colores para unirse: más alto, zonas más grandes y menos detalle.",
+        "en": "Mean shift merges each pixel with neighbors of similar color. The **bandwidth** is how different two colors can be and still merge: higher means bigger areas and less detail.",
+    },
+    "wb.group_on": {"es": "Agrupar colores (mean shift)", "en": "Group colors (mean shift)"},
+    "wb.group_bandwidth": {"es": "Ancho de banda (bandwidth)", "en": "Bandwidth"},
+    "wb.group_bandwidth_help": {
+        "es": "Diferencia de color, en niveles de 0 a 255, hasta la que se unen dos colores.",
+        "en": "Color difference, in levels from 0 to 255, up to which two colors merge.",
+    },
+    "wb.grouping": {"es": "Agrupando colores…", "en": "Grouping colors…"},
+    "wb.group_before": {"es": "Antes (con la curva)", "en": "Before (with the curve)"},
+    "wb.group_after": {"es": "Agrupada", "en": "Grouped"},
+    "wb.group_active": {
+        "es": "🧩 Esta foto agrupa colores (ancho de banda {bandwidth}). Ábrelo con «Agrupar» para cambiarlo o quitarlo.",
+        "en": "🧩 This photo groups colors (bandwidth {bandwidth}). Open it with “Group” to change or remove it.",
+    },
     "wb.curves_active": {
         "es": "🎚️ Esta foto tiene una curva de tonos. Ábrela con «Curvas» para cambiarla o quitarla.",
         "en": "🎚️ This photo has a tone curve. Open it with “Curves” to change or remove it.",
