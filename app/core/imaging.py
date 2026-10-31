@@ -7,9 +7,18 @@ through ``lineart.clean`` before anyone sees it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+
+from PIL import Image
+
 from app.core import gemini, lineart, pages, usage
 from app.core.books import now
 from app.core.schema import Book, Engine, Page, Version
+
+AI_PAGE_COST_USD = 0.14  # estimate shown before converting many pages at once
+BATCH_WORKERS = 3  # AI conversions running at the same time in convert_pages
 
 STYLE_PROMPTS = {
     "realistic": (
@@ -131,12 +140,18 @@ def render_coloring_page(photo: bytes, size: tuple[int, int], prompt: str) -> by
     return gemini.generate_image(prompt, reference_images=[photo], aspect_ratio=aspect_for(*size), image_size="2K")
 
 
-def convert_page(book: Book, page: Page, engine: Engine) -> Page:
-    """Convert a page's (cropped) photo and store the result as its new selected version.
+@dataclass
+class Rendered:
+    """A conversion that is ready to store: model output, cleaned page, and its version."""
 
-    ``engine`` is ``"gemini"`` (AI, paid) or ``"draft"`` (offline, free). Raises
-    ``gemini.GeminiError`` when the AI call fails; nothing is stored in that case.
-    """
+    page: Page
+    raw: bytes
+    version: Version
+    clean: Image.Image
+
+
+def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
+    """Convert a page's (cropped) photo without storing anything. Raises ``gemini.GeminiError``."""
     style = page.style or book.style
     background = page.background or book.background
     photo = pages.cropped_photo(book.slug, page)
@@ -157,4 +172,43 @@ def convert_page(book: Book, page: Page, engine: Engine) -> Page:
         warnings=cleaned.warnings,
         created_at=now(),
     )
-    return pages.add_version(book.slug, page.id, version, raw, cleaned.image)
+    return Rendered(page, raw, version, cleaned.image)
+
+
+def _store(book: Book, rendered: Rendered) -> Page:
+    return pages.add_version(book.slug, rendered.page.id, rendered.version, rendered.raw, rendered.clean)
+
+
+def convert_page(book: Book, page: Page, engine: Engine) -> Page:
+    """Convert a page's (cropped) photo and store the result as its new selected version.
+
+    ``engine`` is ``"gemini"`` (AI, paid) or ``"draft"`` (offline, free). Raises
+    ``gemini.GeminiError`` when the AI call fails; nothing is stored in that case.
+    """
+    return _store(book, render_page(book, page, engine))
+
+
+def convert_pages(
+    book: Book, page_list: list[Page], engine: Engine, on_done: Callable[[int, Page, str | None], None] | None = None
+) -> list[tuple[Page, str]]:
+    """Convert several pages, ``BATCH_WORKERS`` AI calls at a time; returns the failures.
+
+    Every result is stored from the calling thread as soon as it arrives, so ``pages.json``
+    is never written by two threads. ``on_done(count, page, error)`` reports each page.
+    """
+    failures: list[tuple[Page, str]] = []
+    workers = BATCH_WORKERS if engine == "gemini" else 1
+    # usage.book_context is process-wide: set it once around the pool, not per thread.
+    with usage.book_context(book.id), ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(render_page, book, page, engine): page for page in page_list}
+        for count, future in enumerate(as_completed(futures), start=1):
+            page = futures[future]
+            try:
+                _store(book, future.result())
+                error = None
+            except gemini.GeminiError as exc:
+                error = str(exc)
+                failures.append((page, error))
+            if on_done:
+                on_done(count, page, error)
+    return failures

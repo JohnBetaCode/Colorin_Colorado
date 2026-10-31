@@ -7,7 +7,8 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
-from app.core import books, pages
+from app.core import books, imaging, pages
+from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import Book, Page
 from app.ui.common import flash, seed
@@ -122,10 +123,46 @@ def _render_delete_confirmation(book: Book, page_list: list[Page]) -> None:
         st.rerun()
 
 
+def _convert_all(book: Book, pending: list[Page], engine: str) -> None:
+    progress = st.progress(0.0, text=t("pages.converting_all", done=0, total=len(pending)))
+
+    def on_done(count: int, page: Page, error: str | None) -> None:
+        progress.progress(count / len(pending), text=t("pages.converting_all", done=count, total=len(pending)))
+
+    failures = imaging.convert_pages(book, pending, engine, on_done)
+    if failures:
+        names = ", ".join(p.title.strip() or p.original_name for p, _ in failures)
+        flash("warning", t("pages.converted_all_failed", done=len(pending) - len(failures), names=names, error=failures[0][1]))
+    else:
+        flash("success", t("pages.converted_all", n=len(pending)))
+    st.rerun()
+
+
+def _render_convert_all(book: Book, page_list: list[Page]) -> None:
+    pending = [p for p in page_list if p.status == "pending" and p.in_book]
+    if not pending:
+        return
+    with st.container(border=True):
+        st.markdown(t("pages.convert_all_title", n=len(pending)))
+        configured = get_settings().configured
+        col1, col2, _ = st.columns([2, 2, 3])
+        if col1.button(
+            t("pages.convert_all_ai", cost=len(pending) * imaging.AI_PAGE_COST_USD),
+            type="primary",
+            disabled=not configured,
+            help=t("pages.convert_all_ai_help") if configured else t("wb.ai_disabled"),
+            width="stretch",
+        ):
+            _convert_all(book, pending, "gemini")
+        if col2.button(t("pages.convert_all_draft"), help=t("wb.draft_help"), width="stretch"):
+            _convert_all(book, pending, "draft")
+
+
 def render(book: Book, page_list: list[Page]) -> None:
     _render_uploader(book, expanded=not page_list)
     if not page_list:
         return
+    _render_convert_all(book, page_list)
     approved = sum(p.status == "approved" for p in page_list)
     st.caption(t("pages.summary", total=len(page_list), approved=approved))
     _render_delete_confirmation(book, page_list)

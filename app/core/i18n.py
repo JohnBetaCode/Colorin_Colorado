@@ -282,6 +282,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Delete the page **{title}** with all its versions?",
     },
     "pages.deleted": {"es": "Página borrada.", "en": "Page deleted."},
+    "pages.convert_all_title": {
+        "es": "**{n} páginas** del libro aún no tienen dibujo.",
+        "en": "**{n} pages** in the book have no drawing yet.",
+    },
+    "pages.convert_all_ai": {"es": "✨ Convertir todas con IA (≈ ${cost:.2f})", "en": "✨ Convert all with AI (≈ ${cost:.2f})"},
+    "pages.convert_all_ai_help": {
+        "es": "Tres a la vez; unos 15 segundos por página. Revisa y aprueba cada una después en la mesa de trabajo.",
+        "en": "Three at a time; about 15 seconds per page. Check and approve each one in the workbench afterwards.",
+    },
+    "pages.convert_all_draft": {"es": "✏️ Borrador gratis de todas", "en": "✏️ Free draft of all"},
+    "pages.converting_all": {"es": "Convirtiendo… {done} de {total}", "en": "Converting… {done} of {total}"},
+    "pages.converted_all": {"es": "Se convirtieron {n} páginas.", "en": "Converted {n} pages."},
+    "pages.converted_all_failed": {
+        "es": "Se convirtieron {done}. Fallaron: {names}. Primer error: {error}",
+        "en": "Converted {done}. Failed: {names}. First error: {error}",
+    },
     # Export
     "export.page_size": {"es": "Tamaño de página", "en": "Page size"},
     "export.include_photo": {"es": "Foto de referencia en cada página", "en": "Reference photo on every page"},

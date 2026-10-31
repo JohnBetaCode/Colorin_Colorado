@@ -140,3 +140,25 @@ def test_import_rejects_other_zips_and_unsafe_paths(photo, line_art):
     imported = books.import_zip(buffer.getvalue())
     assert not (books.BOOKS_DIR / "escape.txt").exists() and not (books.BOOKS_DIR.parent / "escape.txt").exists()
     assert pages.load_pages(imported.slug)
+
+
+def test_convert_pages_stores_every_result_and_reports_failures(photo, monkeypatch):
+    from app.core import gemini
+
+    book = books.create_book("Aves del jardín")
+    page_list = [pages.add_photo(book.slug, f"ave-{i}.png", photo) for i in range(4)]
+    fail_id = page_list[2].id
+    real_render = imaging.render_page
+
+    def flaky_render(book, page, engine):
+        if page.id == fail_id:
+            raise gemini.GeminiError("blocked")
+        return real_render(book, page, "draft")
+
+    monkeypatch.setattr(imaging, "render_page", flaky_render)
+    seen = []
+    failures = imaging.convert_pages(book, page_list, "gemini", lambda count, page, error: seen.append((count, error)))
+    assert [p.id for p, _ in failures] == [fail_id]
+    assert sorted(count for count, _ in seen) == [1, 2, 3, 4]
+    stored = {p.id: p for p in pages.load_pages(book.slug)}
+    assert [stored[p.id].status for p in page_list] == ["converted", "converted", "pending", "converted"]
