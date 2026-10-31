@@ -169,7 +169,9 @@ def plain_markup(text: str) -> str:
     return "<br/>".join(escape(line.strip()) for line in text.strip().splitlines())
 
 
-def _caption(page: Page, scale: float, fonts: Fonts) -> list[Paragraph]:
+def _caption(book: Book, page: Page, scale: float, fonts: Fonts) -> list[Paragraph]:
+    """The caption, and in a bilingual book its translation below it, smaller and muted."""
+
     def style(name: str, font: str, size: float, leading: float, color, space: float = 0) -> ParagraphStyle:
         return ParagraphStyle(name, fontName=font, fontSize=size * scale, leading=leading * scale, textColor=color, spaceBefore=space * scale)
 
@@ -180,6 +182,13 @@ def _caption(page: Page, scale: float, fonts: Fonts) -> list[Paragraph]:
         items.append(Paragraph(escape(page.subtitle.strip()), style("subtitle", fonts.italic, 14, 17, MUTED, 1)))
     if page.info.strip():
         items.append(Paragraph(info_markup(page.info), style("info", fonts.regular, 14, 18, INK, 6 if items else 0)))
+    other = page.translation
+    if len(book.languages) > 1 and not other.is_empty:
+        # The subtitle is often a scientific name or a date: print it once.
+        if other.title.strip():
+            items.append(Paragraph(escape(other.title.strip()), style("title2", fonts.bold, 16, 19, MUTED, 8)))
+        if other.info.strip():
+            items.append(Paragraph(info_markup(other.info), style("info2", fonts.italic, 12, 15, MUTED, 2)))
     return items
 
 
@@ -216,7 +225,7 @@ def caption_fits(book: Book, page: Page, fonts: Fonts | None = None) -> bool:
     photo = _photo_box(info, pages.photo_size(book.slug, page)) if book.include_reference_photo else None
     _, _, tw, th = _text_box(info, photo)
     fonts = fonts or load_fonts()
-    return fit_text(lambda scale: _caption(page, scale, fonts), tw, th)[2]
+    return fit_text(lambda scale: _caption(book, page, scale, fonts), tw, th)[2]
 
 
 # --- Drawing ---------------------------------------------------------------------
@@ -310,7 +319,7 @@ def _legal(book: Book, included: list[Page], scale: float, fonts: Fonts) -> list
     credits = _credits(included)
     if credits:
         heading = ParagraphStyle("credits", parent=body, fontName=fonts.bold, spaceBefore=(16 if items else 0) * scale)
-        items.append(Paragraph(escape(i18n.t("pdf.photo_credits", lang=book.language)), heading))
+        items.append(Paragraph(escape(" / ".join(i18n.t_all("pdf.photo_credits", book.languages))), heading))
         for number, page in credits:
             line = i18n.t("pdf.credit_line", lang=book.language, n=number, title=page.title.strip() or page.original_name, credit=page.credit.strip())
             items.append(Paragraph(escape(line), body))
@@ -333,7 +342,11 @@ def _draw_owner_page(c: Canvas, book: Book, layout: Layout, fonts: Fonts) -> Non
     _frame(c, layout)
     x, w = MARGIN + PAD * 2, layout.width - 2 * (MARGIN + PAD * 2)
     style = ParagraphStyle("owner", fontName=fonts.bold, fontSize=26, leading=32, alignment=TA_CENTER, textColor=INK)
-    bottom = centered(c, i18n.t("pdf.owner", lang=book.language), style, x, layout.height * 0.6, w)
+    first, *others = i18n.t_all("pdf.owner", book.languages)
+    bottom = centered(c, first, style, x, layout.height * 0.6, w)
+    second = ParagraphStyle("owner2", fontName=fonts.italic, fontSize=18, leading=22, alignment=TA_CENTER, textColor=MUTED)
+    for text in others:
+        bottom = centered(c, text, second, x, bottom - 4, w)
     c.setStrokeColor(INK)
     c.setLineWidth(1.5)
     c.line(x + w * 0.12, bottom - 0.9 * inch, x + w * 0.88, bottom - 0.9 * inch)
@@ -357,7 +370,7 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
             c.rect(*photo)
         if page.has_caption:
             tx, ty, tw, th = _text_box(info, photo)
-            items, total, fits = fit_text(lambda scale: _caption(page, scale, fonts), tw, th)
+            items, total, fits = fit_text(lambda scale: _caption(book, page, scale, fonts), tw, th)
             draw_text(c, items, (tx, ty, tw, th), ty + th - (th - total) / 2 if fits else ty + th)
 
     c.setFont(fonts.regular, 10)

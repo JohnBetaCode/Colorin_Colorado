@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import commons, export, gemini, imaging, pages
+from app.core import captions, commons, export, gemini, imaging, pages
 from app.core.config import get_settings
-from app.core.i18n import t
-from app.core.schema import BACKGROUNDS, LICENSES, STYLES, Book, Crop, Engine, Page
+from app.core.i18n import LANGUAGE_NAMES, t
+from app.core.schema import BACKGROUNDS, LICENSES, STYLES, Book, Caption, Crop, Engine, Page
 from app.ui.common import flash, seed
 
 MIN_CROP = 10  # percent of the photo on each axis
@@ -37,6 +37,69 @@ def _save_crop(slug: str, page_id: str) -> None:
     top, bottom = st.session_state[f"crop_y_{page_id}"]
     if right - left >= MIN_CROP and bottom - top >= MIN_CROP:
         pages.set_crop(slug, page_id, Crop(left=left / 100, top=top / 100, right=right / 100, bottom=bottom / 100))
+
+
+TRANSLATION_FIELDS = ("title", "subtitle", "info")
+
+
+def _save_translation(slug: str, page_id: str) -> None:
+    values = {field: st.session_state[f"tr_{field}_{page_id}"] for field in TRANSLATION_FIELDS}
+    pages.update_page(slug, page_id, translation=Caption(**values))
+
+
+def _forget_translation_widgets(page_list: list[Page]) -> None:
+    """Drop the translation fields' state so they show the stored text on the next run."""
+    for page in page_list:
+        for field in TRANSLATION_FIELDS:
+            st.session_state.pop(f"tr_{field}_{page.id}", None)
+
+
+def _render_translation(book: Book, page: Page, page_list: list[Page]) -> None:
+    if len(book.languages) < 2:
+        return
+    language = LANGUAGE_NAMES[book.languages[1]]
+    with st.expander(t("wb.translation", language=language), expanded=not page.translation.is_empty):
+        for field in TRANSLATION_FIELDS:
+            seed(f"tr_{field}_{page.id}", getattr(page.translation, field))
+            widget = st.text_area if field == "info" else st.text_input
+            widget(
+                t(f"wb.caption_{field}"),
+                key=f"tr_{field}_{page.id}",
+                on_change=_save_translation,
+                args=(book.slug, page.id),
+            )
+        configured = get_settings().configured
+        missing = captions.missing_translations(book, page_list)
+        col1, col2 = st.columns(2)
+        one = col1.button(
+            t("wb.translate"),
+            key=f"translate_{page.id}",
+            width="stretch",
+            disabled=not configured or not page.has_caption,
+            help=None if configured else t("wb.ai_disabled"),
+        )
+        everything = col2.button(
+            t("wb.translate_all", n=len(missing)),
+            key=f"translate_all_{page.id}",
+            width="stretch",
+            disabled=not configured or not missing,
+        )
+        if not (one or everything):
+            return
+        todo = [page] if one else missing
+        failed = []
+        with st.spinner(t("wb.translating")):
+            for item in todo:
+                try:
+                    captions.translate_page(book, item)
+                except gemini.GeminiError as exc:
+                    failed.append(str(exc))
+        _forget_translation_widgets(todo)
+        if failed:
+            flash("error", t("wb.translate_failed", error=failed[0]))
+        else:
+            flash("success", t("wb.translated", n=len(todo)))
+        st.rerun()
 
 
 def _fill_from_commons(slug: str, page_id: str) -> None:
@@ -302,5 +365,6 @@ def render(book: Book, page_list: list[Page]) -> None:
     with photo_col:
         _render_photo(book, page)
         _render_caption(book, page)
+        _render_translation(book, page, page_list)
     with art_col:
         _render_coloring_page(book, page, next_id)

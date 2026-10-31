@@ -28,6 +28,11 @@ def t(key: str, lang: str | None = None, **params) -> str:
     return text.format(**params) if params else text
 
 
+def t_all(key: str, languages: list[str], **params) -> list[str]:
+    """``key`` in each of ``languages``, for labels printed in a bilingual book."""
+    return [t(key, lang=language, **params) for language in languages]
+
+
 STRINGS: dict[str, dict[str, str]] = {
     # Home
     "home.tagline": {
@@ -130,6 +135,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "es": "Idioma de los textos fijos del PDF. Los textos que escribes salen tal cual.",
         "en": "Language of the PDF's fixed labels. The text you type is printed as typed.",
     },
+    "book.second_language": {"es": "Segundo idioma (libro bilingüe)", "en": "Second language (bilingual book)"},
+    "book.second_language_help": {
+        "es": "Cada página lleva también su texto en este idioma, más pequeño, y los textos fijos del PDF salen en los dos.",
+        "en": "Every page also carries its text in this language, smaller, and the PDF's fixed labels are printed in both.",
+    },
+    "book.no_second_language": {"es": "Ninguno", "en": "None"},
     "book.edit": {"es": "✏️ Editar libro", "en": "✏️ Edit book"},
     "book.save": {"es": "Guardar cambios", "en": "Save changes"},
     "book.saved": {"es": "Libro actualizado.", "en": "Book updated."},
@@ -256,6 +267,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "es": "El texto no cabe en el recuadro y se cortará en el PDF. Acórtalo un poco.",
         "en": "The text does not fit in the box and will be cut in the PDF. Shorten it a little.",
     },
+    "wb.translation": {"es": "🌐 Texto en {language}", "en": "🌐 Text in {language}"},
+    "wb.translate": {"es": "🌐 Traducir esta página con IA", "en": "🌐 Translate this page with AI"},
+    "wb.translate_all": {"es": "🌐 Traducir las que faltan ({n})", "en": "🌐 Translate the missing ones ({n})"},
+    "wb.translating": {"es": "Traduciendo…", "en": "Translating…"},
+    "wb.translated": {"es": "Páginas traducidas: {n}. Revísalas antes de imprimir.", "en": "Pages translated: {n}. Check them before printing."},
+    "wb.translate_failed": {"es": "No se pudo traducir: {error}", "en": "Translation failed: {error}"},
     "wb.credit": {"es": "Crédito de la foto", "en": "Photo credit"},
     "wb.license": {"es": "Licencia de la foto", "en": "Photo license"},
     "wb.license_help": {

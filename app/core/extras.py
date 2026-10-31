@@ -253,22 +253,23 @@ def available(book: Book, page_list: list[Page]) -> list[str]:
 
 
 def _label(key: str, book: Book, **params) -> str:
-    return i18n.t(key, lang=book.language, **params)
+    """The label in the book's languages: one line each, joined with " / "."""
+    return " / ".join(i18n.t_all(key, book.languages, **params))
 
 
 def _heading(c: Canvas, book: Book, fonts: Fonts, box: Box, title_key: str, hint_key: str | None = None, **params) -> float:
-    """Title and one line of instructions at the top of ``box``; returns the y below them."""
+    """Title and instructions at the top of ``box`` (second language below, muted); returns the y below them."""
     x, y, w, h = box
-    title = ParagraphStyle("extra_title", fontName=fonts.bold, fontSize=28, leading=34, alignment=TA_CENTER, textColor=INK)
-    paragraph = Paragraph(_label(title_key, book), title)
-    _, ph = paragraph.wrap(w, h)
-    top = y + h - ph
-    paragraph.drawOn(c, x, top)
-    if hint_key:
-        hint = ParagraphStyle("extra_hint", fontName=fonts.italic, fontSize=14, leading=18, alignment=TA_CENTER, textColor=MUTED)
-        paragraph = Paragraph(_label(hint_key, book, **params), hint)
-        _, hh = paragraph.wrap(w, h)
-        top -= hh + 6
+    title, *other_titles = i18n.t_all(title_key, book.languages)
+    hints = i18n.t_all(hint_key, book.languages, **params) if hint_key else []
+    styles = [ParagraphStyle("extra_title", fontName=fonts.bold, fontSize=28, leading=34, alignment=TA_CENTER, textColor=INK)]
+    styles += [ParagraphStyle("extra_title2", fontName=fonts.bold, fontSize=18, leading=22, alignment=TA_CENTER, textColor=MUTED)] * len(other_titles)
+    styles += [ParagraphStyle("extra_hint", fontName=fonts.italic, fontSize=14, leading=18, alignment=TA_CENTER, textColor=MUTED)] * len(hints)
+    top = y + h
+    for text, style in zip([title, *other_titles, *hints], styles):
+        paragraph = Paragraph(escape(text), style)
+        _, ph = paragraph.wrap(w, h)
+        top -= ph + (0 if top == y + h else 4)
         paragraph.drawOn(c, x, top)
     return top - 0.3 * inch
 
@@ -471,14 +472,14 @@ def draw_diploma(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
         (_label("pdf.diploma_title", book), style(38), 0),
         (_label("pdf.diploma_for", book), style(16, fonts.italic, MUTED), 0.5 * inch),
     ):
-        paragraph = Paragraph(text, paragraph_style)
+        paragraph = Paragraph(escape(text), paragraph_style)
         _, ph = paragraph.wrap(inner, h)
         top -= space + ph
         paragraph.drawOn(c, x + 0.6 * inch, top)
     top -= 0.9 * inch
     c.setLineWidth(1.5)
     c.line(x + w * 0.15, top, x + w * 0.85, top)
-    paragraph = Paragraph(_label("pdf.diploma_reason", book, title=escape(book.title)), style(18, fonts.regular))
+    paragraph = Paragraph(escape(_label("pdf.diploma_reason", book, title=book.title)), style(18, fonts.regular))
     _, ph = paragraph.wrap(inner, h)
     top -= 0.5 * inch + ph
     paragraph.drawOn(c, x + 0.6 * inch, top)
@@ -493,7 +494,7 @@ def draw_diploma(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
 def draw_closing(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     x, y, w, h = box
     style = ParagraphStyle("closing", fontName=fonts.bold, fontSize=30, leading=38, alignment=TA_CENTER, textColor=INK)
-    paragraph = Paragraph(_label("pdf.closing", book), style)
+    paragraph = Paragraph("<br/><br/>".join(escape(t) for t in i18n.t_all("pdf.closing", book.languages)), style)
     _, ph = paragraph.wrap(w - inch, h)
     middle = y + h * 0.55
     paragraph.drawOn(c, x + 0.5 * inch, middle - ph / 2)

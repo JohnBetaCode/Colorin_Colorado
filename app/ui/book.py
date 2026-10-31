@@ -12,6 +12,7 @@ from app.ui import export_panel, kdp_panel, pages_grid, workbench
 from app.ui.common import flash, language_switch, seed, show_flash
 
 VIEWS = ("workbench", "pages", "export", "kdp")
+NO_SECOND_LANGUAGE = "none"  # stored as None; not None itself, which a selectbox shows as empty
 
 
 def _close_book() -> None:
@@ -33,6 +34,7 @@ def _render_sidebar(book: Book) -> None:
         fields = ("title", "subtitle", "dedication", "style", "age_group", "background", "language")
         for field in fields:
             seed(f"edit_{field}_{book.slug}", getattr(book, field))
+        seed(f"edit_second_language_{book.slug}", book.second_language or NO_SECOND_LANGUAGE)
         key = lambda field: f"edit_{field}_{book.slug}"  # noqa: E731
         with st.expander(t("book.edit")):
             with st.form("edit_book"):
@@ -56,11 +58,19 @@ def _render_sidebar(book: Book) -> None:
                     help=t("book.language_help"),
                     key=key("language"),
                 )
+                second_language = st.selectbox(
+                    t("book.second_language"),
+                    [NO_SECOND_LANGUAGE, *LANGUAGES],
+                    format_func=lambda lang: t("book.no_second_language") if lang == NO_SECOND_LANGUAGE else LANGUAGE_NAMES[lang],
+                    help=t("book.second_language_help"),
+                    key=key("second_language"),
+                )
                 if st.form_submit_button(t("book.save"), type="primary"):
                     book.title = title.strip() or book.title
                     book.subtitle = subtitle.strip()
                     book.dedication = dedication.strip()
                     book.style, book.age_group, book.background, book.language = style, age_group, background, language
+                    book.second_language = None if second_language in (NO_SECOND_LANGUAGE, language) else second_language
                     books.save_book(book)
                     flash("success", t("book.saved"))
                     st.rerun()

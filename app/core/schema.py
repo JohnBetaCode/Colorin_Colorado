@@ -57,6 +57,18 @@ class CoverArt(BaseModel):
     created_at: str
 
 
+class Caption(BaseModel):
+    """A page's text in one language."""
+
+    title: str = ""
+    subtitle: str = ""
+    info: str = ""
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.title.strip() or self.subtitle.strip() or self.info.strip())
+
+
 class Book(BaseModel):
     id: str
     slug: str
@@ -67,6 +79,7 @@ class Book(BaseModel):
     age_group: AgeGroup = "6-8"
     background: Background = "simplify"
     language: Language = "es"
+    second_language: Language | None = None  # captions and fixed labels printed in both languages
     page_size: PageSize = "letter"
     include_reference_photo: bool = True
     include_owner_page: bool = True
@@ -84,6 +97,12 @@ class Book(BaseModel):
     cover_art_selected: int | None = None  # None: the cover page's line art on the front
     created_at: str
     updated_at: str
+
+    @property
+    def languages(self) -> list[str]:
+        """The languages the PDF is printed in: the book's, then the second one, if any."""
+        second = self.second_language
+        return [self.language, second] if second and second != self.language else [self.language]
 
 
 class Crop(BaseModel):
@@ -119,6 +138,7 @@ class Page(BaseModel):
     title: str = ""
     subtitle: str = ""
     info: str = ""
+    translation: Caption = Field(default_factory=Caption)  # the caption in the book's second language
     credit: str = ""  # who took the photo and its license, printed on the copyright page
     license: License = "unknown"
     source_url: str = ""  # where the photo comes from, e.g. its Wikimedia Commons page

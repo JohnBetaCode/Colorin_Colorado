@@ -127,3 +127,39 @@ def test_line_art_is_upsampled_to_print_resolution(tmp_path, line_art):
     points_per_px = min(box[0] / image.width, box[1] / image.height)
     assert 72 / points_per_px >= export.PRINT_DPI
     assert set(np.unique(np.array(image))) <= {0, 255}
+
+
+def test_bilingual_books_print_both_languages(photo, line_art):
+    from app.core.schema import Caption
+
+    book, _ = _book_with_pages(photo, line_art, second_language="en", extras=["maze", "closing"])
+    toucan = pages.load_pages(book.slug)[0]
+    pages.update_page(book.slug, toucan.id, translation=Caption(title="Keel-billed toucan", info="Where it lives: rainforests"))
+    reader = PdfReader(export.export_book_pdf(book))
+    text = " ".join(page.extract_text() for page in reader.pages)
+    for label in ("Este libro pertenece a", "This book belongs to", "Tucán pico iris", "Keel-billed toucan", "Laberinto", "Maze"):
+        assert label in text, label
+    assert "Colorín colorado" in text and "Snip, snap, snout" in text
+    assert book.languages == ["es", "en"]
+    book.second_language = "es"
+    assert book.languages == ["es"]  # the same language twice is one language
+
+
+def test_translate_fills_the_second_language(photo, line_art, monkeypatch):
+    from app.core import captions, gemini
+    from app.core.schema import Caption
+
+    book, _ = _book_with_pages(photo, line_art, second_language="en")
+    prompts = []
+
+    def fake(prompt, schema):
+        prompts.append(prompt)
+        return schema(title="Keel-billed toucan", subtitle="Ramphastos sulfuratus", info="Where it lives: rainforests")
+
+    monkeypatch.setattr(gemini, "extract_structured", fake)
+    missing = captions.missing_translations(book, pages.load_pages(book.slug))
+    assert [p.title for p in missing] == ["Tucán pico iris"]  # the other page has no caption
+    page = captions.translate_page(book, missing[0])
+    assert page.translation == Caption(title="Keel-billed toucan", subtitle="Ramphastos sulfuratus", info="Where it lives: rainforests")
+    assert "from Español to English" in prompts[0] and "Dónde vive: bosques húmedos" in prompts[0]
+    assert captions.missing_translations(book, pages.load_pages(book.slug)) == []
