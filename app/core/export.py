@@ -365,7 +365,8 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
         c.roundRect(*info, RADIUS)
         photo = None
         if book.include_reference_photo:
-            photo_reader, photo_size = _photo_reader(pages.cropped_photo(book.slug, page))
+            # The real photo for the reader: with its curve, without the color grouping.
+            photo_reader, photo_size = _photo_reader(pages.cropped_photo(book.slug, page, group=False))
             photo = _photo_box(info, photo_size)
             c.drawImage(photo_reader, *photo)
             c.setLineWidth(0.6)

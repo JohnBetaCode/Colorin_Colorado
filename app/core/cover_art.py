@@ -163,7 +163,7 @@ def _references(book: Book, page_list: list[Page]) -> list[bytes]:
         art = pages.selected_path(book.slug, page)
         if art:
             images.append(art.read_bytes())
-        photo = pages.cropped_photo(book.slug, page)
+        photo = pages.cropped_photo(book.slug, page, group=False)  # the real colors for a color cover
         photo.thumbnail((1024, 1024))
         images.append(pages.jpeg_bytes(photo))
     return images

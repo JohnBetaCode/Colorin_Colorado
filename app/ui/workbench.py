@@ -10,7 +10,7 @@ from __future__ import annotations
 import streamlit as st
 from PIL import Image
 
-from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates, tones
+from app.core import books, captions, commons, export, gemini, grouping, imaging, mosaic, pages, templates, tones
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import (
@@ -298,7 +298,8 @@ def _render_photo(book: Book, page: Page) -> None:
     crop = page.crop
     seed(f"crop_x_{page.id}", (round(crop.left * 100), round(crop.right * 100)))
     seed(f"crop_y_{page.id}", (round(crop.top * 100), round(crop.bottom * 100)))
-    with st.expander(t("wb.crop"), expanded=not crop.is_full or page.curve is not None):
+    adjusted = not crop.is_full or page.curve is not None or page.group is not None
+    with st.expander(t("wb.crop"), expanded=adjusted):
         st.caption(t("wb.crop_help"))
         st.slider(
             t("wb.crop_horizontal"),
@@ -316,7 +317,7 @@ def _render_photo(book: Book, page: Page) -> None:
             on_change=_save_crop,
             args=(book.slug, page.id),
         )
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         col1.button(
             t("wb.crop_reset"),
             key=f"crop_reset_{page.id}",
@@ -330,18 +331,54 @@ def _render_photo(book: Book, page: Page) -> None:
             key=f"curves_toggle_{page.id}",
             width="stretch",
             help=t("wb.curves_help"),
-            on_click=_toggle_curves,
-            args=(page.id,),
+            on_click=_toggle,
+            args=(f"curves_open_{page.id}",),
+        )
+        col3.button(
+            t("wb.group"),
+            key=f"group_toggle_{page.id}",
+            width="stretch",
+            help=t("wb.group_help"),
+            on_click=_toggle,
+            args=(f"group_open_{page.id}",),
         )
         if st.session_state.get(f"curves_open_{page.id}"):
             _render_curves(book, page)
         elif page.curve is not None:
             st.caption(t("wb.curves_active"))
+        if st.session_state.get(f"group_open_{page.id}"):
+            _render_group(book, page)
+        elif page.group is not None:
+            st.caption(t("wb.group_active", bandwidth=page.group))
 
 
-def _toggle_curves(page_id: str) -> None:
-    key = f"curves_open_{page_id}"
+def _toggle(key: str) -> None:
     st.session_state[key] = not st.session_state.get(key, False)
+
+
+def _save_group(slug: str, page_id: str) -> None:
+    on = st.session_state[f"group_on_{page_id}"]
+    pages.update_page(slug, page_id, group=st.session_state[f"group_bandwidth_{page_id}"] if on else None)
+
+
+def _render_group(book: Book, page: Page) -> None:
+    """Color grouping: on or off, its bandwidth, and the photo before and after (after the curve)."""
+    st.caption(t("wb.group_editor_help"))
+    seed(f"group_on_{page.id}", page.group is not None)
+    seed(f"group_bandwidth_{page.id}", page.group or grouping.DEFAULT_BANDWIDTH)
+    save = {"on_change": _save_group, "args": (book.slug, page.id)}
+    st.checkbox(t("wb.group_on"), key=f"group_on_{page.id}", **save)
+    st.slider(
+        t("wb.group_bandwidth"), grouping.MIN_BANDWIDTH, grouping.MAX_BANDWIDTH, help=t("wb.group_bandwidth_help"),
+        key=f"group_bandwidth_{page.id}", disabled=page.group is None, **save,
+    )
+    if page.group is not None:
+        before, after = st.columns(2)
+        with st.spinner(t("wb.grouping")):
+            grouped = pages.cropped_photo(book.slug, page)
+        curved = pages.cropped_photo(book.slug, page, group=False)
+        before.image(curved, caption=t("wb.group_before"), width="stretch")
+        after.image(grouped, caption=t("wb.group_after"), width="stretch")
 
 
 def _set_curve(slug: str, page_id: str, points: list[tuple[int, int]] | None) -> None:

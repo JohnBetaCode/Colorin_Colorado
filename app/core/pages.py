@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from app.core import lineart, tones
+from app.core import grouping, lineart, tones
 from app.core.books import book_path
 from app.core.schema import Crop, Page, Version
 
@@ -74,16 +74,24 @@ def selected_path(slug: str, page: Page) -> Path | None:
     return path if path.exists() else None
 
 
-def cropped_photo(slug: str, page: Page, curve: bool = True) -> Image.Image:
-    """The original photo with the page's crop applied and, unless ``curve`` is False, its
-    tone curve: what every engine converts and the PDF shows as the reference photo."""
-    image = Image.open(original_path(slug, page)).convert("RGB")
+def cropped_photo(slug: str, page: Page, curve: bool = True, group: bool = True) -> Image.Image:
+    """The original photo with the page's crop applied, then its tone curve (unless ``curve``
+    is False), then its color grouping when it has one (unless ``curve`` or ``group`` is
+    False): what every engine converts. The PDF's reference photo leaves the grouping out."""
+    path = original_path(slug, page)
+    image = Image.open(path).convert("RGB")
     crop = page.crop
     if not crop.is_full:
         w, h = image.size
         box = (round(crop.left * w), round(crop.top * h), round(crop.right * w), round(crop.bottom * h))
         image = image.crop(box)
-    return tones.apply(image, page.curve) if curve else image
+    if not curve:
+        return image
+    image = tones.apply(image, page.curve)
+    if group and page.group is not None:
+        made_from = (str(path), path.stat().st_mtime, crop.left, crop.top, crop.right, crop.bottom, str(page.curve))
+        image = grouping.group(image, page.group, key=made_from)
+    return image
 
 
 def photo_size(slug: str, page: Page) -> tuple[int, int]:

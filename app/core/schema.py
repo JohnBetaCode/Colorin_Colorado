@@ -172,6 +172,7 @@ class Version(BaseModel):
     background: Background
     instructions: str = ""
     curve: list[tuple[int, int]] | None = None  # the photo's tone curve when it was converted
+    group: int | None = None  # and its color grouping bandwidth
     warnings: list[str] = Field(default_factory=list)
     mosaic: MosaicSettings | None = None  # what a mosaic version was made with
     created_at: str
@@ -193,6 +194,7 @@ class Page(BaseModel):
     instructions: str = ""
     crop: Crop = Field(default_factory=Crop)
     curve: list[tuple[int, int]] | None = None  # tone curve on the photo (tones.py); None: as shot
+    group: int | None = None  # color grouping bandwidth after the curve (grouping.py); None: off
     mosaic: MosaicSettings | None = None  # None: the book's
     versions: list[Version] = Field(default_factory=list)
     last_version: int = 0  # highest Version.n ever given: a deleted version's number is never reused
