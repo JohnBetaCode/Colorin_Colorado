@@ -108,3 +108,26 @@ def test_review_blocks_photos_that_cannot_be_sold(photo, line_art):
     pages.update_page(book.slug, page_list[1].id, license="cc_by_sa", credit="Ana, CC BY-SA 4.0")
     issues = {i.key: i for i in kdp.review(book).issues}
     assert "license_not_for_sale" not in issues and issues["share_alike"].params["names"] == "Ave 2"
+
+
+def test_suggested_listing_is_trimmed_to_kdp_limits(photo, line_art, monkeypatch):
+    from app.core import captions, gemini
+    from app.core.schema import Listing
+
+    book = _book(photo, line_art, 3, extras=["maze"])
+    seen = []
+
+    def fake(prompt, schema):
+        seen.append(prompt)
+        return Listing(
+            description=" <p>Un libro.</p> ",
+            keywords=[f"palabra {i}" for i in range(9)] + ["x" * 80, " "],
+            categories=["A", "B", "C", "D"],
+            reading_age=" 6-8 ",
+        )
+
+    monkeypatch.setattr(gemini, "extract_structured", fake)
+    listing = captions.suggest_listing(book, pages.load_pages(book.slug))
+    assert listing.description == "<p>Un libro.</p>" and listing.reading_age == "6-8"
+    assert len(listing.keywords) == 7 and listing.categories == ["A", "B", "C"]
+    assert "Ave 1" in seen[0] and "maze" in seen[0] and "Español" in seen[0]

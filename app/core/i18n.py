@@ -499,6 +499,27 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "kdp.trim.letter": {"es": "8.5 × 11 in (21.59 × 27.94 cm)", "en": "8.5 × 11 in (21.59 × 27.94 cm)"},
     "kdp.trim.a4": {"es": "8.27 × 11.69 in (21 × 29.7 cm)", "en": "8.27 × 11.69 in (21 × 29.7 cm)"},
+    "kdp.listing": {"es": "📝 Ficha de Amazon", "en": "📝 Amazon listing"},
+    "kdp.listing_help": {
+        "es": "Lo que pide KDP en «Detalles del libro». La IA lo redacta a partir de las páginas del libro; revísalo y cámbialo a tu gusto antes de copiarlo.",
+        "en": "What KDP asks for in “Book details”. The AI drafts it from the book's pages; check it and change it as you like before copying it.",
+    },
+    "kdp.listing_suggest": {"es": "✨ Sugerir con IA", "en": "✨ Suggest with AI"},
+    "kdp.listing_suggesting": {"es": "Redactando la ficha…", "en": "Drafting the listing…"},
+    "kdp.listing_done": {"es": "Ficha sugerida. Revísala antes de usarla.", "en": "Listing suggested. Check it before using it."},
+    "kdp.listing_failed": {"es": "No se pudo redactar: {error}", "en": "Drafting failed: {error}"},
+    "kdp.listing_description": {"es": "Descripción (HTML simple)", "en": "Description (simple HTML)"},
+    "kdp.listing_keywords": {"es": "Palabras clave, una por línea ({n} de 7)", "en": "Keywords, one per line ({n} of 7)"},
+    "kdp.listing_keywords_help": {
+        "es": "Lo que escribiría alguien que busca este libro. Sin repetir el título, sin marcas ni «gratis» o «más vendido».",
+        "en": "What someone looking for this book would type. Not the title again, no brands, no “free” or “best seller”.",
+    },
+    "kdp.listing_keywords_warning": {
+        "es": "KDP acepta hasta {max} palabras clave de {chars} caracteres como máximo.",
+        "en": "KDP takes up to {max} keywords of at most {chars} characters each.",
+    },
+    "kdp.listing_categories": {"es": "Categorías sugeridas, una por línea", "en": "Suggested categories, one per line"},
+    "kdp.listing_reading_age": {"es": "Edad de lectura", "en": "Reading age"},
     "kdp.cover": {"es": "Portada para KDP", "en": "KDP cover"},
     "kdp.cover_help": {
         "es": "Un solo PDF con contraportada, lomo y portada, a la medida del interior actual: {width:.3f} × {height:.3f} in con lomo de {spine:.3f} in. El título va en el lomo cuando es lo bastante ancho (unas 96 páginas). La esquina inferior derecha de la contraportada queda libre para el código de barras que pone KDP.",

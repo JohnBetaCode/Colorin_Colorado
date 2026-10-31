@@ -8,10 +8,10 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
-from app.core import books, cover, cover_art, export, gemini, kdp, pages
+from app.core import books, captions, cover, cover_art, export, gemini, kdp, pages
 from app.core.config import get_settings
 from app.core.i18n import t
-from app.core.schema import ART_MODES, COVER_COLORS, INKS, Book, Page
+from app.core.schema import ART_MODES, COVER_COLORS, INKS, Book, Listing, Page
 from app.ui.common import flash, seed
 
 # Front image option meaning "no cover image": the cover page's line art (stored as None).
@@ -40,6 +40,66 @@ def _new_art(book: Book, n: int) -> None:
     st.session_state.pop(_key(book, "cover_art_selected"), None)
     flash("success", t("kdp.art_added", n=n))
     st.rerun()
+
+
+LISTING_FIELDS = ("description", "keywords", "categories", "reading_age")
+LIST_FIELDS = ("keywords", "categories")  # one per line in their text area
+
+
+def _listing_value(listing: Listing, field: str) -> str:
+    value = getattr(listing, field)
+    return "\n".join(value) if field in LIST_FIELDS else value
+
+
+def _save_listing(slug: str) -> None:
+    book = books.load_book(slug)
+    values = {}
+    for field in LISTING_FIELDS:
+        text = st.session_state[_key(book, f"listing_{field}")]
+        values[field] = [line.strip() for line in text.splitlines() if line.strip()] if field in LIST_FIELDS else text
+    book.listing = Listing(**values)
+    books.save_book(book)
+
+
+def _render_listing(book: Book) -> None:
+    st.markdown(f"#### {t('kdp.listing')}")
+    st.caption(t("kdp.listing_help"))
+    configured = get_settings().configured
+    if st.button(t("kdp.listing_suggest"), disabled=not configured, help=None if configured else t("wb.ai_disabled")):
+        with st.spinner(t("kdp.listing_suggesting")):
+            try:
+                book.listing = captions.suggest_listing(book, pages.load_pages(book.slug))
+            except gemini.GeminiError as exc:
+                st.error(t("kdp.listing_failed", error=exc))
+                return
+        books.save_book(book)
+        for field in LISTING_FIELDS:
+            st.session_state.pop(_key(book, f"listing_{field}"), None)
+        flash("success", t("kdp.listing_done"))
+        st.rerun()
+    for field in LISTING_FIELDS:
+        seed(_key(book, f"listing_{field}"), _listing_value(book.listing, field))
+    st.text_area(t("kdp.listing_description"), height=220, key=_key(book, "listing_description"), on_change=_save_listing, args=(book.slug,))
+    col1, col2 = st.columns(2)
+    col1.text_area(
+        t("kdp.listing_keywords", n=len(book.listing.keywords)),
+        height=200,
+        help=t("kdp.listing_keywords_help"),
+        key=_key(book, "listing_keywords"),
+        on_change=_save_listing,
+        args=(book.slug,),
+    )
+    col2.text_area(
+        t("kdp.listing_categories"),
+        height=120,
+        key=_key(book, "listing_categories"),
+        on_change=_save_listing,
+        args=(book.slug,),
+    )
+    col2.text_input(t("kdp.listing_reading_age"), key=_key(book, "listing_reading_age"), on_change=_save_listing, args=(book.slug,))
+    too_long = [k for k in book.listing.keywords if len(k) > captions.MAX_KEYWORD_CHARS]
+    if len(book.listing.keywords) > captions.MAX_KEYWORDS or too_long:
+        st.warning(t("kdp.listing_keywords_warning", max=captions.MAX_KEYWORDS, chars=captions.MAX_KEYWORD_CHARS))
 
 
 def _latest_cover(book: Book) -> Path | None:
@@ -238,6 +298,8 @@ def render(book: Book) -> None:
     _render_numbers(book, review)
     st.divider()
     _render_checks(book, review)
+    st.divider()
+    _render_listing(book)
     if any(issue.key == "no_pages" for issue in review.issues):
         return
     st.divider()

@@ -69,6 +69,15 @@ class Caption(BaseModel):
         return not (self.title.strip() or self.subtitle.strip() or self.info.strip())
 
 
+class Listing(BaseModel):
+    """The book's Amazon product page details, as entered on KDP."""
+
+    description: str = ""  # KDP accepts simple HTML: <p>, <br>, <b>, <i>, <ul>, <li>
+    keywords: list[str] = Field(default_factory=list)  # up to 7, 50 characters each
+    categories: list[str] = Field(default_factory=list)  # up to 3, as KDP's category paths
+    reading_age: str = ""  # e.g. "6-8"
+
+
 class Book(BaseModel):
     id: str
     slug: str
@@ -93,6 +102,7 @@ class Book(BaseModel):
     list_price: float = 9.99
     cover_color: CoverColor = "blue"
     back_text: str = ""
+    listing: Listing = Field(default_factory=Listing)
     cover_art: list[CoverArt] = Field(default_factory=list)  # never overwritten, like page versions
     cover_art_selected: int | None = None  # None: the cover page's line art on the front
     created_at: str
