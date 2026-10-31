@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/images/banner.jpg" alt="Colorín Colorado: a photo of a toucan, its coloring page, and the page being colored in with crayons">
-</p>
+![Colorín Colorado: a photo of a toucan, its coloring page, and the page being colored in with crayons](docs/images/banner.jpg)
 
 # 🖍️ Colorín Colorado
 
