@@ -131,3 +131,22 @@ def test_suggested_listing_is_trimmed_to_kdp_limits(photo, line_art, monkeypatch
     assert listing.description == "<p>Un libro.</p>" and listing.reading_age == "6-8"
     assert len(listing.keywords) == 7 and listing.categories == ["A", "B", "C"]
     assert "Ave 1" in seen[0] and "maze" in seen[0] and "Español" in seen[0]
+
+
+def test_costs_and_royalties_in_other_stores():
+    assert kdp.printing_cost(104, "black", "uk") == 2.15 and kdp.printing_cost(200, "black", "uk") == 3.25
+    assert kdp.printing_cost(104, "black", "es") == 2.48 and kdp.printing_cost(104, "premium_color", "es") == 8.19
+    assert kdp.printing_cost(104, "standard_color", "uk") == 3.66
+    assert kdp.royalty_rate(7.99, "uk") == 0.60 and kdp.royalty_rate(7.98, "uk") == 0.50
+    assert kdp.min_price(2.15, "uk") == 4.30
+    assert kdp.royalty(9.99, 2.48, "es") == 3.51
+
+
+def test_new_trims_have_their_page_ranges_and_covers(photo, line_art):
+    width, height = kdp.cover_size(104, "black", "square")
+    assert (width, height) == pytest.approx((0.25 + 17 + 104 * 0.002252, 8.75))
+    book = _book(photo, line_art, 10, blank_backs=True, page_size="8x10", kdp_ink="standard_color", marketplace="uk")
+    issues = {i.key: i for i in kdp.review(book).issues}
+    assert issues["too_few_pages"].params["min"] == 72
+    reader = PdfReader(export.export_book_pdf(book))
+    assert (round(float(reader.pages[0].mediabox.width)), round(float(reader.pages[0].mediabox.height))) == (576, 720)

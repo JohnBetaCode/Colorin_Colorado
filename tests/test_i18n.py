@@ -15,6 +15,7 @@ from app.core.schema import (
     EXTRAS,
     INKS,
     LICENSES,
+    MARKETPLACES,
     PAGE_SIZES,
     STATUSES,
     STYLES,
@@ -59,6 +60,7 @@ def test_every_option_and_warning_has_a_label():
         "art_source": ART_SOURCES,
         "license": LICENSES,
         "extra": EXTRAS,
+        "marketplace": MARKETPLACES,
         "export.extra_missing": ("word_search", "dots", "solutions"),
     }
     missing = [f"{p}.{v}" for p, values in prefixes.items() for v in values if f"{p}.{v}" not in STRINGS]

@@ -38,7 +38,7 @@ from app.core import extras, i18n, pages
 from app.core.books import book_path
 from app.core.schema import Book, Page
 
-PAGE_SIZES = {"letter": LETTER, "a4": A4}
+PAGE_SIZES = {"letter": LETTER, "a4": A4, "8x10": (8 * inch, 10 * inch), "square": (8.5 * inch, 8.5 * inch)}
 MARGIN = 0.5 * inch  # also KDP's minimum inside margin up to 300 pages (kdp.MAX_PAGES)
 FOOTER = 0.3 * inch
 BOX_RATIO = 0.24  # share of the content height taken by the info box

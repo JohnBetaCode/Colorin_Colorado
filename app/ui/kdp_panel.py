@@ -11,7 +11,7 @@ from PIL import Image
 from app.core import books, captions, cover, cover_art, export, gemini, kdp, pages
 from app.core.config import get_settings
 from app.core.i18n import t
-from app.core.schema import ART_MODES, COVER_COLORS, INKS, Book, Listing, Page
+from app.core.schema import ART_MODES, COVER_COLORS, INKS, MARKETPLACES, Book, Listing, Page
 from app.ui.common import flash, seed
 
 # Front image option meaning "no cover image": the cover page's line art (stored as None).
@@ -108,7 +108,8 @@ def _latest_cover(book: Book) -> Path | None:
 
 
 def _render_numbers(book: Book, review: kdp.Review) -> None:
-    col1, col2 = st.columns(2)
+    symbol = kdp.CURRENCY[book.marketplace]
+    col1, col2, col3 = st.columns(3)
     seed(_key(book, "kdp_ink"), book.kdp_ink)
     col1.selectbox(
         t("kdp.ink"),
@@ -119,26 +120,35 @@ def _render_numbers(book: Book, review: kdp.Review) -> None:
         on_change=_save,
         args=(book.slug, "kdp_ink"),
     )
+    seed(_key(book, "marketplace"), book.marketplace)
+    col2.selectbox(
+        t("kdp.marketplace"),
+        MARKETPLACES,
+        format_func=lambda market: t(f"marketplace.{market}"),
+        key=_key(book, "marketplace"),
+        on_change=_save,
+        args=(book.slug, "marketplace"),
+    )
     seed(_key(book, "list_price"), book.list_price)
-    col2.number_input(
-        t("kdp.price"),
+    col3.number_input(
+        t("kdp.price", symbol=symbol),
         min_value=0.0,
         max_value=kdp.MAX_PRICE,
         step=1.0,
         format="%.2f",
-        help=t("kdp.price_help"),
+        help=t("kdp.price_help", symbol=symbol, threshold=kdp.ROYALTY_THRESHOLD[book.marketplace]),
         key=_key(book, "list_price"),
         on_change=_save,
         args=(book.slug, "list_price"),
     )
-    money = lambda value: "—" if value is None else f"${value:.2f}"  # noqa: E731
+    money = lambda value: "—" if value is None else f"{symbol}{value:.2f}"  # noqa: E731
     col1, col2, col3, col4 = st.columns(4)
     col1.metric(t("kdp.pages"), review.pages)
     col2.metric(t("kdp.spine"), f"{review.spine:.3f} in")
     col3.metric(t("kdp.cost"), money(review.cost))
     col4.metric(t("kdp.royalty"), money(review.royalty))
     if review.min_price is not None:
-        st.caption(t("kdp.min_price", price=review.min_price))
+        st.caption(t("kdp.min_price", price=review.min_price, symbol=symbol))
 
 
 def _render_checks(book: Book, review: kdp.Review) -> None:

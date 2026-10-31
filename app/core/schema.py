@@ -14,7 +14,8 @@ Style = Literal["realistic", "cartoon"]
 AgeGroup = Literal["3-5", "6-8", "9+"]
 Background = Literal["keep", "simplify", "remove"]
 Language = Literal["es", "en"]
-PageSize = Literal["letter", "a4"]
+PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
+Marketplace = Literal["us", "uk", "es"]  # the Amazon store KDP costs and royalties are estimated for
 Engine = Literal["gemini", "draft"]
 Status = Literal["pending", "converted", "approved"]
 Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
@@ -32,7 +33,8 @@ License = Literal[
 STYLES: tuple[Style, ...] = ("realistic", "cartoon")
 AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+")
 BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
-PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4")
+PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
+MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 ENGINES: tuple[Engine, ...] = ("gemini", "draft")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
 INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
@@ -99,7 +101,8 @@ class Book(BaseModel):
     legal: str = ""  # copyright page text: rights, edition, ISBN
     # Amazon KDP: interior ink and list price (cost and royalty estimates), and the wraparound cover.
     kdp_ink: Ink = "black"
-    list_price: float = 9.99
+    marketplace: Marketplace = "us"
+    list_price: float = 9.99  # in the marketplace's currency, before VAT
     cover_color: CoverColor = "blue"
     back_text: str = ""
     listing: Listing = Field(default_factory=Listing)
