@@ -9,10 +9,24 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import captions, commons, export, gemini, imaging, pages, templates
+from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
-from app.core.schema import BACKGROUNDS, LICENSES, STYLES, Book, Caption, Crop, Engine, Page
+from app.core.schema import (
+    BACKGROUNDS,
+    LICENSES,
+    MOSAIC_CELLS,
+    MOSAIC_FILLS,
+    MOSAIC_SYMBOLS,
+    STYLES,
+    Book,
+    Caption,
+    Crop,
+    Engine,
+    MosaicSettings,
+    Page,
+    Version,
+)
 from app.ui.common import flash, seed
 
 MIN_CROP = 10  # percent of the photo on each axis
@@ -138,8 +152,63 @@ def _approve(slug: str, page_id: str, next_id: str | None) -> None:
         st.session_state.wb_page = next_id
 
 
+MOSAIC_FIELDS = ("symbols", "fill", "cells", "tones", "columns", "contrast", "brightness")
+
+
+def _mosaic_from_widgets(page_id: str) -> MosaicSettings:
+    return MosaicSettings(**{field: st.session_state[f"mosaic_{field}_{page_id}"] for field in MOSAIC_FIELDS})
+
+
+def _save_mosaic(slug: str, page_id: str) -> None:
+    pages.update_page(slug, page_id, mosaic=_mosaic_from_widgets(page_id))
+
+
+def _mosaic_for_book(book: Book, page_id: str) -> None:
+    book.mosaic = _mosaic_from_widgets(page_id)
+    books.save_book(book)
+    flash("success", t("wb.mosaic_made_default"))
+
+
+def _render_mosaic_options(book: Book, page: Page) -> None:
+    settings = mosaic.settings_for(book, page)
+    with st.expander(t("wb.mosaic_options")):
+        for field in MOSAIC_FIELDS:
+            seed(f"mosaic_{field}_{page.id}", getattr(settings, field))
+        save = {"on_change": _save_mosaic, "args": (book.slug, page.id)}
+        col1, col2 = st.columns(2)
+        col1.selectbox(
+            t("wb.mosaic_symbols"), MOSAIC_SYMBOLS, format_func=lambda s: t(f"mosaic_symbols.{s}"),
+            key=f"mosaic_symbols_{page.id}", **save,
+        )
+        col2.selectbox(
+            t("wb.mosaic_fill"), MOSAIC_FILLS, format_func=lambda f: t(f"mosaic_fill.{f}"),
+            key=f"mosaic_fill_{page.id}", **save,
+        )
+        col1.radio(
+            t("wb.mosaic_cells"), MOSAIC_CELLS, format_func=lambda c: t(f"mosaic_cells.{c}"), horizontal=True,
+            key=f"mosaic_cells_{page.id}", **save,
+        )
+        col2.slider(
+            t("wb.mosaic_tones"), mosaic.MIN_TONES, mosaic.MAX_TONES, help=t("wb.mosaic_tones_help"),
+            key=f"mosaic_tones_{page.id}", **save,
+        )
+        st.slider(
+            t("wb.mosaic_columns"), mosaic.MIN_COLUMNS, mosaic.MAX_COLUMNS["square"],
+            help=t("wb.mosaic_columns_help", max=mosaic.MAX_COLUMNS["diagonal"]),
+            key=f"mosaic_columns_{page.id}", **save,
+        )
+        col1, col2 = st.columns(2)
+        col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
+        col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
+        st.button(
+            t("wb.mosaic_make_default"), help=t("wb.mosaic_make_default_help"), key=f"mosaic_default_{page.id}",
+            on_click=_mosaic_for_book, args=(book, page.id),
+        )
+
+
 def _convert(book: Book, page: Page, engine: Engine) -> None:
-    with st.spinner(t("wb.converting") if engine == "gemini" else t("wb.drafting")):
+    spinner = {"gemini": "wb.converting", "draft": "wb.drafting", "mosaic": "wb.mosaic_drawing"}[engine]
+    with st.spinner(t(spinner)):
         try:
             updated = imaging.convert_page(book, page, engine)
         except gemini.GeminiError as exc:
@@ -253,13 +322,24 @@ def _render_caption(book: Book, page: Page) -> None:
 def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
     st.markdown(f"#### {t('wb.coloring_page')} · {t(f'status.{page.status}')}")
     path = pages.selected_path(book.slug, page)
-    if path:
+    if path and page.is_mosaic:
+        puzzle, solution = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
+        puzzle.image(export.mosaic_preview(book, page), width="stretch")
+        solution.image(str(path), width="stretch")
+        st.caption(t("wb.mosaic_hidden"))
+    elif path:
         st.image(str(path), width="stretch")
-        version = next(v for v in page.versions if v.n == page.selected)
-        for warning in version.warnings:
+        for warning in page.selected_version.warnings:
             st.warning(t(f"warning.{warning}"))
     else:
         st.info(t("wb.not_converted"))
+
+    def version_label(version: Version) -> str:
+        if version.mosaic:  # the style means nothing to a mosaic
+            detail = t("wb.mosaic_version", columns=version.mosaic.columns, tones=version.mosaic.tones)
+        else:
+            detail = t(f"style.{version.style}")
+        return t("wb.version_label", n=version.n, engine=t(f"engine.{version.engine}"), style=detail)
 
     if len(page.versions) > 1:
         by_n = {v.n: v for v in page.versions}
@@ -268,9 +348,7 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
             t("wb.versions"),
             list(by_n),
             horizontal=True,
-            format_func=lambda n: t(
-                "wb.version_label", n=n, engine=t(f"engine.{by_n[n].engine}"), style=t(f"style.{by_n[n].style}")
-            ),
+            format_func=lambda n: version_label(by_n[n]),
             key=f"version_{page.id}",
             on_change=_select_version,
             args=(book.slug, page.id),
@@ -309,8 +387,10 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
         args=(book.slug, page.id, "instructions"),
     )
 
+    _render_mosaic_options(book, page)
+
     configured = get_settings().configured
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     if col1.button(
         t("wb.regenerate") if page.versions else t("wb.convert"),
         type="primary",
@@ -322,6 +402,8 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
         _convert(book, page, "gemini")
     if col2.button(t("wb.draft"), width="stretch", help=t("wb.draft_help"), key=f"draft_{page.id}"):
         _convert(book, page, "draft")
+    if col3.button(t("wb.mosaic"), width="stretch", help=t("wb.mosaic_help"), key=f"mosaic_{page.id}"):
+        _convert(book, page, "mosaic")
 
     col1, col2 = st.columns(2)
     col1.button(

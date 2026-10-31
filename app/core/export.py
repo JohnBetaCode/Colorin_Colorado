@@ -22,6 +22,7 @@ from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import pypdfium2 as pdfium
 from PIL import Image
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -34,7 +35,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
-from app.core import extras, i18n, pages
+from app.core import extras, i18n, mosaic, pages
 from app.core.books import book_path
 from app.core.schema import Book, Page
 
@@ -379,6 +380,35 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
     c.showPage()
 
 
+def _draw_mosaic_sheet(c: Canvas, book: Book, page: Page, number: int, mystery: int, layout: Layout, fonts: Fonts) -> None:
+    """A mystery mosaic: its number and how to play, the faint grid, and the legend.
+
+    No title and no reference photo, which would give the picture away: both are on the
+    solutions page.
+    """
+    x, y, w, h = layout.content
+    top = y + h
+    c.setFillColor(INK)
+    c.setFont(fonts.bold, 18)
+    c.drawCentredString(x + w / 2, top - 18, extras.label("pdf.mosaic_title", book, n=mystery))
+    c.setFillColor(MUTED)
+    c.setFont(fonts.italic, 11)
+    c.drawCentredString(x + w / 2, top - 36, extras.label("pdf.mosaic_hint", book))
+    legend_h = mosaic.legend_height(book.languages)
+    grid_box = (x, y + legend_h + GAP, w, h - 44 - legend_h - 2 * GAP)
+    version = page.selected_version
+    settings = version.mosaic or mosaic.default_settings(book.age_group)
+    grid = mosaic.load_grid(pages.version_path(book.slug, page.id, version.n, raw=True))
+    mosaic.draw_puzzle(c, grid, settings, grid_box, fonts.regular)
+    mosaic.draw_legend(c, settings, (x, y, w, legend_h), fonts, book.languages)
+
+    if number:  # the workbench preview has none
+        c.setFont(fonts.regular, 10)
+        c.setFillColor(MUTED)
+        c.drawCentredString(layout.width / 2, MARGIN, str(number))
+    c.showPage()
+
+
 # --- Public API ---------------------------------------------------------------------
 
 
@@ -398,7 +428,7 @@ def preflight(book: Book) -> Preflight:
         report.included.append(page)
         if page.status != "approved":
             report.not_approved.append(page)
-        if not caption_fits(book, page, fonts):
+        if not page.is_mosaic and not caption_fits(book, page, fonts):
             report.overflowing.append(page)
     ready = extras.available(book, report.included)
     report.extras_missing = [extra for extra in book.extras if extra not in ready]
@@ -421,9 +451,11 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
         order += ["color_test", *back]
     for page in included:
         order += [page, *back]
-    for extra in ready:
-        if extra != "color_test":
-            order += [extra, *back]
+    # The mystery mosaics' solutions go after the activities, before the diploma and closing page.
+    after = [extra for extra in ready if extra != "color_test"]
+    split = next((i for i, extra in enumerate(after) if extra in ("diploma", "closing")), len(after))
+    for extra in after[:split] + extras.mosaic_solution_sheets(included) + after[split:]:
+        order += [extra, *back]
     return order
 
 
@@ -450,11 +482,15 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
     c.setTitle(book.title)
     c.setCreator("Colorín Colorado")
 
+    mysteries = {page.id: n for n, page in enumerate(extras.mysteries(included), start=1)}
     number = 0
     for sheet in sheets(book, included):
         if isinstance(sheet, Page):
             number += 1
-            _draw_sheet(c, book, sheet, number, layout, fonts)
+            if sheet.is_mosaic:
+                _draw_mosaic_sheet(c, book, sheet, number, mysteries[sheet.id], layout, fonts)
+            else:
+                _draw_sheet(c, book, sheet, number, layout, fonts)
         elif sheet == "title":
             _draw_title_page(c, book, cover, layout, fonts)
         elif sheet == "legal":
@@ -468,3 +504,20 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
             c.showPage()
     c.save()
     return path
+
+
+def mosaic_preview(book: Book, page: Page, dpi: int = 100) -> Image.Image:
+    """The page's mystery mosaic as it will print, for the workbench."""
+    layout = _layout(book)
+    fonts = load_fonts()
+    buffer = BytesIO()
+    c = Canvas(buffer, pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
+    included = [p for p in pages.load_pages(book.slug) if p.in_book and p.is_mosaic]
+    mystery = next((n for n, p in enumerate(included, start=1) if p.id == page.id), 1)
+    _draw_mosaic_sheet(c, book, page, 0, mystery, layout, fonts)
+    c.save()
+    pdf = pdfium.PdfDocument(buffer.getvalue())
+    try:
+        return pdf[0].render(scale=dpi / 72).to_pil().convert("RGB")
+    finally:
+        pdf.close()

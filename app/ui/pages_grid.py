@@ -160,7 +160,7 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
     with st.container(border=True):
         st.markdown(t("pages.convert_all_title", n=len(pending)))
         configured = get_settings().configured
-        col1, col2, _ = st.columns([2, 2, 3])
+        col1, col2, col3 = st.columns(3)
         if col1.button(
             t("pages.convert_all_ai", cost=len(pending) * imaging.AI_PAGE_COST_USD),
             type="primary",
@@ -171,6 +171,8 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
             _convert_all(book, pending, "gemini")
         if col2.button(t("pages.convert_all_draft"), help=t("wb.draft_help"), width="stretch"):
             _convert_all(book, pending, "draft")
+        if col3.button(t("pages.convert_all_mosaic"), help=t("wb.mosaic_help"), width="stretch"):
+            _convert_all(book, pending, "mosaic")
 
 
 def render(book: Book, page_list: list[Page]) -> None:

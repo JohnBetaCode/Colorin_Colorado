@@ -3,13 +3,15 @@ a diploma and a closing page.
 
 Activities are generated, never drawn by the AI: a word search with one word from each
 page title, a maze, and a connect-the-dots made from a coloring page's silhouette (its
-outline turns into numbered dots, the details inside stay). Sizes follow the age group,
+outline turns into numbered dots, the details inside stay). Mystery mosaics get their own
+solutions pages, which ``export`` adds whenever the book has one. Sizes follow the age group,
 and every random choice is seeded with the book's id, so a book always exports the same
 puzzles. ``export`` decides where each page goes; this module generates and draws them.
 """
 
 from __future__ import annotations
 
+import math
 import random
 import re
 import unicodedata
@@ -28,10 +30,11 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
-from app.core import i18n, pages
+from app.core import i18n, mosaic, pages
 from app.core.schema import EXTRAS, Book, Page
 
 if TYPE_CHECKING:
@@ -75,6 +78,8 @@ def word_list(page_list: list[Page], age_group: str) -> list[str]:
     size = GRID_SIZE[age_group]
     words: list[str] = []
     for page in page_list:
+        if page.is_mosaic:  # its title is the mystery's answer
+            continue
         candidates = re.findall(r"[^\W\d_]+", page.title)
         if not candidates:
             continue
@@ -225,6 +230,7 @@ def dots_page(book: Book, page_list: list[Page]) -> Page | None:
     Only a subject alone has a clean silhouette: in a scene the outline runs through the
     background and the dots make no sense, so scenes are used only when chosen.
     """
+    page_list = [p for p in page_list if not p.is_mosaic]
     chosen = [p for p in page_list if p.id == book.dots_page_id]
     alone = [p for p in page_list if p.id != book.dots_page_id and (p.background or book.background) == "remove"]
     return next((p for p in chosen + alone if dots_for(book, p) is not None), None)
@@ -253,7 +259,7 @@ def available(book: Book, page_list: list[Page]) -> list[str]:
 # --- Drawing ----------------------------------------------------------------------
 
 
-def _label(key: str, book: Book, **params) -> str:
+def label(key: str, book: Book, **params) -> str:
     """The label in the book's languages: one line each, joined with " / "."""
     return " / ".join(i18n.t_all(key, book.languages, **params))
 
@@ -378,8 +384,8 @@ def draw_maze(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     left = x + (w - cell * puzzle.cols) / 2
     c.setFillColor(INK)
     c.setFont(fonts.bold, 14)
-    c.drawString(left, bottom - label_h + 0.08 * inch, _label("pdf.maze_start", book))
-    c.drawRightString(left + cell * puzzle.cols, y + 0.05 * inch, _label("pdf.maze_end", book))
+    c.drawString(left, bottom - label_h + 0.08 * inch, label("pdf.maze_start", book))
+    c.drawRightString(left + cell * puzzle.cols, y + 0.05 * inch, label("pdf.maze_end", book))
 
 
 def _draw_gray(c: Canvas, image: Image.Image, box: Box) -> tuple[float, float, float]:
@@ -424,7 +430,7 @@ def draw_solutions(c: Canvas, book: Book, page_list: list[Page], fonts: Fonts, b
         top = bottom - i * (cell_h + gap)
         c.setFillColor(MUTED)
         c.setFont(fonts.bold, 13)
-        c.drawString(x, top - 13, _label(f"pdf.{activity}", book))
+        c.drawString(x, top - 13, label(f"pdf.{activity}", book))
         area = (x, top - cell_h, w, cell_h - 22)
         if activity == "word_search":
             words = word_list(page_list, book.age_group)
@@ -435,6 +441,53 @@ def draw_solutions(c: Canvas, book: Book, page_list: list[Page], fonts: Fonts, b
             path = pages.selected_path(book.slug, dots_page(book, page_list))
             with Image.open(path) as image:
                 _draw_gray(c, image.convert("L"), area)
+
+
+MOSAIC_SOLUTIONS_PER_PAGE = 6  # 2 columns × 3 rows
+
+
+def mysteries(page_list: list[Page]) -> list[Page]:
+    """The mystery mosaics, in book order: their position is the number printed on them."""
+    return [p for p in page_list if p.is_mosaic]
+
+
+def mosaic_solution_sheets(page_list: list[Page]) -> list[str]:
+    """One ``mosaic_solutions:<i>`` sheet per ``MOSAIC_SOLUTIONS_PER_PAGE`` mysteries."""
+    pages_needed = math.ceil(len(mysteries(page_list)) / MOSAIC_SOLUTIONS_PER_PAGE)
+    return [f"mosaic_solutions:{i}" for i in range(pages_needed)]
+
+
+def _fit_string(text: str, font: str, size: float, width: float) -> str:
+    """``text`` cut with an ellipsis so it fits ``width`` points."""
+    if stringWidth(text, font, size) <= width:
+        return text
+    while text and stringWidth(text + "…", font, size) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
+def draw_mosaic_solutions(c: Canvas, book: Book, page_list: list[Page], fonts: Fonts, box: Box, index: int) -> None:
+    """Page ``index`` of the solutions: each mystery filled in, small, with its number and title."""
+    x, y, w, h = box
+    start = index * MOSAIC_SOLUTIONS_PER_PAGE
+    shown = mysteries(page_list)[start : start + MOSAIC_SOLUTIONS_PER_PAGE]
+    bottom = _heading(c, book, fonts, box, "pdf.mosaic_solutions") if index == 0 else y + h
+    cols, rows, gap, label_h = 2, 3, 0.3 * inch, 20
+    cell_w = (w - gap * (cols - 1)) / cols
+    cell_h = (bottom - y - gap * (rows - 1)) / rows
+    for i, page in enumerate(shown):
+        row, col = divmod(i, cols)
+        left, top = x + col * (cell_w + gap), bottom - row * (cell_h + gap)
+        version = page.selected_version
+        settings = version.mosaic or mosaic.default_settings(book.age_group)
+        grid = mosaic.load_grid(pages.version_path(book.slug, page.id, version.n, raw=True))
+        mosaic.draw_solution(c, grid, settings, (left, top - cell_h + label_h, cell_w, cell_h - label_h))
+        text = label("pdf.mosaic_title", book, n=start + i + 1)
+        if page.title.strip():
+            text += f" · {page.title.strip()}"
+        c.setFillColor(MUTED)
+        c.setFont(fonts.bold, 11)
+        c.drawCentredString(left + cell_w / 2, top - cell_h + 4, _fit_string(text, fonts.bold, 11, cell_w))
 
 
 def _frame(c: Canvas, box: Box) -> None:
@@ -470,8 +523,8 @@ def draw_diploma(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     inner = w - 1.2 * inch
     top = y + h - 1.7 * inch
     for text, paragraph_style, space in (
-        (_label("pdf.diploma_title", book), style(38), 0),
-        (_label("pdf.diploma_for", book), style(16, fonts.italic, MUTED), 0.5 * inch),
+        (label("pdf.diploma_title", book), style(38), 0),
+        (label("pdf.diploma_for", book), style(16, fonts.italic, MUTED), 0.5 * inch),
     ):
         paragraph = Paragraph(escape(text), paragraph_style)
         _, ph = paragraph.wrap(inner, h)
@@ -480,7 +533,7 @@ def draw_diploma(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     top -= 0.9 * inch
     c.setLineWidth(1.5)
     c.line(x + w * 0.15, top, x + w * 0.85, top)
-    paragraph = Paragraph(escape(_label("pdf.diploma_reason", book, title=book.title)), style(18, fonts.regular))
+    paragraph = Paragraph(escape(label("pdf.diploma_reason", book, title=book.title)), style(18, fonts.regular))
     _, ph = paragraph.wrap(inner, h)
     top -= 0.5 * inch + ph
     paragraph.drawOn(c, x + 0.6 * inch, top)
@@ -489,7 +542,7 @@ def draw_diploma(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
     for i, key in enumerate(("pdf.diploma_date", "pdf.diploma_signature")):
         lx = x + w * (0.1 + i * 0.47)
         c.line(lx, y + 1.3 * inch, lx + w * 0.36, y + 1.3 * inch)
-        c.drawCentredString(lx + w * 0.18, y + 1.05 * inch, _label(key, book))
+        c.drawCentredString(lx + w * 0.18, y + 1.05 * inch, label(key, book))
 
 
 def draw_closing(c: Canvas, book: Book, fonts: Fonts, box: Box) -> None:
@@ -521,4 +574,6 @@ def draw(kind: str, c: Canvas, book: Book, page_list: list[Page], fonts: Fonts, 
         draw_diploma(c, book, fonts, box)
     elif kind == "closing":
         draw_closing(c, book, fonts, box)
+    elif kind.startswith("mosaic_solutions:"):
+        draw_mosaic_solutions(c, book, page_list, fonts, box, int(kind.split(":")[1]))
 

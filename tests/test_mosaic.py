@@ -1,0 +1,101 @@
+import numpy as np
+from PIL import Image
+from pypdf import PdfReader
+
+from app.core import books, export, extras, imaging, mosaic, pages
+from app.core.schema import MosaicSettings
+
+
+def _half_black(size=(400, 300)) -> Image.Image:
+    """Left half black, right half white."""
+    w, h = size
+    pixels = np.full((h, w), 255, np.uint8)
+    pixels[:, : w // 2] = 0
+    return Image.fromarray(pixels).convert("RGB")
+
+
+def _upper_left_black(size=400) -> Image.Image:
+    """Black above the "/" diagonal of a square, white below."""
+    y, x = np.indices((size, size))
+    return Image.fromarray(np.where(x + y < size, 0, 255).astype(np.uint8)).convert("RGB")
+
+
+def test_grid_follows_the_photo_and_its_shape():
+    grid = mosaic.make_grid(_half_black(), MosaicSettings(columns=20, tones=2))
+    assert grid.shape == (15, 20, 3)  # rows from the 4:3 photo
+    assert (grid[:, :10, 0] == 0).all() and (grid[:, 10:, 0] == 1).all()
+    assert (grid[..., 2] == mosaic.WHOLE).all()
+
+
+def test_diagonal_cells_split_along_edges_only():
+    photo = _upper_left_black()
+    grid = mosaic.make_grid(photo, MosaicSettings(columns=8, tones=2, cells="diagonal"))
+    rows, cols = np.indices(grid.shape[:2])
+    edge = rows + cols == 7
+    assert (grid[edge, 2] == mosaic.SLASH).all()
+    assert (grid[edge, 0] == 0).all() and (grid[edge, 1] == 1).all()  # dark upper-left triangle
+    assert (grid[~edge, 2] == mosaic.WHOLE).all()
+    square = mosaic.make_grid(photo, MosaicSettings(columns=8, tones=2, cells="square"))
+    assert (square[..., 2] == mosaic.WHOLE).all()
+
+
+def test_settings_are_kept_in_range():
+    settings = mosaic.normalized(MosaicSettings(cells="diagonal", columns=99, tones=9, contrast=-80))
+    assert (settings.columns, settings.tones, settings.contrast) == (mosaic.MAX_COLUMNS["diagonal"], 5, -50)
+
+
+def test_grid_survives_the_png_round_trip(tmp_path):
+    grid = mosaic.make_grid(_upper_left_black(), MosaicSettings(columns=12, tones=3, cells="diagonal"))
+    path = tmp_path / "grid.png"
+    path.write_bytes(mosaic.grid_png(grid))
+    assert (mosaic.load_grid(path) == grid).all()
+
+
+def test_solution_is_one_bit_for_both_fills():
+    grid = mosaic.make_grid(_half_black(), MosaicSettings(columns=10, tones=4))
+    for fill in ("tones", "patterns"):
+        assert mosaic.render_solution(grid, MosaicSettings(columns=10, tones=4, fill=fill)).mode == "1"
+
+
+def _mosaic_book(photo):
+    book = books.create_book("Misterios del jardín")
+    first = pages.add_photo(book.slug, "uno.png", photo)
+    pages.update_page(book.slug, first.id, title="Tucán pico iris")
+    second = pages.add_photo(book.slug, "dos.png", photo)
+    pages.update_page(book.slug, second.id, mosaic=MosaicSettings(cells="diagonal", fill="patterns", symbols="shapes"))
+    book = books.load_book(book.slug)
+    imaging.convert_pages(book, pages.load_pages(book.slug), "mosaic")
+    return book
+
+
+def test_mosaic_engine_stores_the_grid_and_a_one_bit_solution(photo):
+    book = _mosaic_book(photo)
+    first, second = pages.load_pages(book.slug)
+    assert first.is_mosaic and first.status == "converted"
+    assert first.selected_version.mosaic == mosaic.default_settings(book.age_group)
+    assert second.selected_version.mosaic.cells == "diagonal"  # the page's own settings
+    grid = mosaic.load_grid(pages.version_path(book.slug, first.id, first.selected, raw=True))
+    assert grid.shape[1] == first.selected_version.mosaic.columns
+    with Image.open(pages.selected_path(book.slug, first)) as solution:
+        assert solution.mode == "1"
+
+
+def test_pdf_hides_the_answer_and_adds_the_solutions(photo):
+    book = _mosaic_book(photo)
+    included = export.preflight(book).included
+    order = export.sheets(book, included)
+    assert order[-1] == "mosaic_solutions:0"
+    reader = PdfReader(export.export_book_pdf(book))
+    assert len(reader.pages) == len(order)
+    puzzle = order.index(included[0])
+    text = reader.pages[puzzle].extract_text()
+    assert "Misterio 1" in text and "Tucán" not in text
+    assert list(reader.pages[puzzle].images) == []  # vectors only: no photo, no picture of the answer
+    solutions = reader.pages[-1].extract_text()
+    assert "Soluciones de los misterios" in solutions and "Misterio 1 · Tucán pico iris" in solutions
+
+
+def test_mosaics_stay_out_of_the_word_search(photo):
+    book = _mosaic_book(photo)
+    assert extras.word_list(pages.load_pages(book.slug), book.age_group) == []
+    assert extras.mosaic_solution_sheets(pages.load_pages(book.slug)) == ["mosaic_solutions:0"]

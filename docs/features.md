@@ -13,6 +13,11 @@ part.
 - **Convert the whole book at once**, or page by page in the workbench.
 - **Versions, never lost.** Every conversion is kept; pick the one you like.
 - **A free draft mode** to lay out a book before spending anything.
+- **Mystery mosaics** (monochrome color-by-number), free and offline: the photo becomes a faint
+  grid with a number, letter, sign or shape in each cell; filled in as the legend says (pencil
+  tones or black-pen patterns), the picture appears. Square cells or cells split diagonally,
+  2 to 5 tones, the grid size and the contrast are adjustable; the page hides its title and photo,
+  and the solutions are printed at the end of the book.
 - **Activities from your own pages**: a word search with the book's words, a maze, a
   connect-the-dots traced from a drawing, their solutions, a color test page, a diploma and a
   closing page.

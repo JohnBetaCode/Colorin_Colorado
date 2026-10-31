@@ -2,7 +2,8 @@
 
 The uploaded photo is always the reference image: the model redraws that exact
 subject as line art, it never invents one from text. Whatever comes back goes
-through ``lineart.clean`` before anyone sees it.
+through ``lineart.clean`` before anyone sees it. Mystery mosaics (``mosaic.py``) are
+the exception: they are a grid of tones, not line art.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 
 from PIL import Image
 
-from app.core import gemini, lineart, pages, usage
+from app.core import gemini, lineart, mosaic, pages, usage
 from app.core.books import now
 from app.core.schema import Book, Engine, Page, Version
 
@@ -175,6 +176,15 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
     style = page.style or book.style
     background = page.background or book.background
     photo = pages.cropped_photo(book.slug, page)
+    if engine == "mosaic":
+        # Not line art: the grid is stored as data and the solution is already 1-bit.
+        settings = mosaic.settings_for(book, page)
+        grid = mosaic.make_grid(photo, settings)
+        version = Version(
+            n=0, engine=engine, style=style, age_group=book.age_group, background=background,
+            mosaic=settings, created_at=now(),
+        )
+        return Rendered(page, mosaic.grid_png(grid), version, mosaic.render_solution(grid, settings))
     if engine == "gemini":
         prompt = build_prompt(style, book.age_group, background, page.title, page.instructions)
         with usage.book_context(book.id):
@@ -202,7 +212,8 @@ def _store(book: Book, rendered: Rendered) -> Page:
 def convert_page(book: Book, page: Page, engine: Engine) -> Page:
     """Convert a page's (cropped) photo and store the result as its new selected version.
 
-    ``engine`` is ``"gemini"`` (AI, paid) or ``"draft"`` (offline, free). Raises
+    ``engine`` is ``"gemini"`` (AI, paid), ``"draft"`` (offline, free) or ``"mosaic"`` (a
+    mystery mosaic, offline, free). Raises
     ``gemini.GeminiError`` when the AI call fails; nothing is stored in that case.
     """
     return _store(book, render_page(book, page, engine))

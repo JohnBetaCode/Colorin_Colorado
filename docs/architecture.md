@@ -40,6 +40,7 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
 | `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three AI calls at a time, stored from the calling thread). |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
+| `core/mosaic.py` | Mystery mosaics, the third engine: `make_grid` (photo → tones per cell or triangle), `render_solution` (1-bit), and the vector drawing of the puzzle, its legend and the solution. Settings per age group, book or page (`settings_for`). |
 | `core/export.py` | `preflight` (what the PDF will contain, captions that overflow, extras the pages cannot make), `sheets` (every interior page in print order) and `export_book_pdf`. |
 | `core/extras.py` | The extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page. Generated, never drawn by the AI, seeded with the book id; `available` says which ones the pages can make. |
 | `core/captions.py` | Text from the text model: `translate` (a caption into the book's second language) and `suggest_listing` (the Amazon description, keywords, categories, reading age). |
@@ -62,6 +63,7 @@ books/<slug>/
   originals/<page-id>.jpg         uploaded photo (EXIF-rotated, max 2048 px)
   lineart/<page-id>/v<n>-raw.png  what the engine returned
   lineart/<page-id>/v<n>.png      1-bit cleaned coloring page
+                                  (mosaic versions: v<n>-raw.png is the grid, v<n>.png the solution)
   cover_art/v<n>.jpg              front cover image, uploaded or drawn by the AI (RGB)
   exports/<slug>-<timestamp>.pdf  one file per build, never overwritten
   exports/covers/<slug>-cover-<pages>p-<timestamp>.pdf
@@ -91,6 +93,26 @@ id, not slug, because a deleted book's slug can be reused.
 draft engine one at a time) and stores each result from the calling thread as it arrives, so
 `pages.json` is never written by two threads. `usage.book_context` is process-wide, so it is set
 once around the pool.
+
+### Mystery mosaics (`mosaic`)
+
+The third engine, offline and free. The cropped photo is turned to gray, its tones spread by a
+blend of a 1–99 percentile stretch and histogram equalization (`EQUALIZE`; a plain stretch leaves
+most photos in the middle tones), then the author's contrast and brightness. Each cell is measured
+on 8 × 8 samples and gets one of 2–5 tones (0 is black). With diagonal cells, a cell is split
+along "/" or "\" when its two triangles cut the squared error to `SPLIT_GAIN` of the whole cell's
+and get different tones, so flat areas stay square and edges get a diagonal.
+
+The grid is stored as an RGB PNG, one pixel per cell (tone of the cell or first triangle, tone of
+the second triangle, split), and `v<n>.png` is the solution rendered through pdfium and dithered
+to 1 bit; `lineart.clean` is skipped. Settings: the page's, else the book's ("Use for the whole
+book"), else `AGE_DEFAULTS`; each version records the ones it was made with.
+
+In the PDF a mosaic page has no title, caption or photo: "Mystery N", the instructions, the grid
+and a symbol per cell or triangle in light gray vectors, and a legend (symbol → pencil gray or pen
+pattern: solid, crosshatch, lines, dots, white). `export.sheets` adds `mosaic_solutions:<i>`
+sheets (six per page, filled in, with number and title) after the activities, before the diploma
+and closing page. Mosaics are left out of the word search and the connect-the-dots.
 
 ### Cleanup (`lineart.clean`)
 

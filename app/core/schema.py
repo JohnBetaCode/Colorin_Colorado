@@ -17,7 +17,12 @@ Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
 Marketplace = Literal["us", "uk", "es"]
 Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
-Engine = Literal["gemini", "draft"]
+Engine = Literal["gemini", "draft", "mosaic"]
+# Mystery mosaics (mosaic.py): the symbol printed in each cell, how each symbol is filled in,
+# and whether cells are whole squares or split along a diagonal into two triangles.
+MosaicSymbols = Literal["numbers", "letters", "signs", "shapes"]
+MosaicFill = Literal["tones", "patterns"]
+MosaicCells = Literal["square", "diagonal"]
 Status = Literal["pending", "converted", "approved"]
 Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
 CoverColor = Literal["blue", "green", "orange", "purple", "pink", "teal"]
@@ -37,7 +42,10 @@ BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
-ENGINES: tuple[Engine, ...] = ("gemini", "draft")
+ENGINES: tuple[Engine, ...] = ("gemini", "draft", "mosaic")
+MOSAIC_SYMBOLS: tuple[MosaicSymbols, ...] = ("numbers", "letters", "signs", "shapes")
+MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "patterns")
+MOSAIC_CELLS: tuple[MosaicCells, ...] = ("square", "diagonal")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
 INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
 COVER_COLORS: tuple[CoverColor, ...] = ("blue", "green", "orange", "purple", "pink", "teal")
@@ -49,6 +57,18 @@ LICENSES: tuple[License, ...] = (
 )
 LICENSES_NOT_FOR_SALE: tuple[License, ...] = ("non_commercial", "no_derivatives")
 LICENSES_WITH_CREDIT: tuple[License, ...] = ("cc_by", "cc_by_sa")  # the credit must be printed
+
+
+class MosaicSettings(BaseModel):
+    """How a photo becomes a mystery mosaic. ``mosaic.default_settings`` gives the age group's."""
+
+    symbols: MosaicSymbols = "numbers"
+    fill: MosaicFill = "tones"
+    cells: MosaicCells = "square"
+    tones: int = 4  # 2 to 5, from black to white
+    columns: int = 30
+    contrast: int = 0  # percent, -50 to 50
+    brightness: int = 0  # percent, -50 to 50
 
 
 class CoverArt(BaseModel):
@@ -111,6 +131,7 @@ class Book(BaseModel):
     listing: Listing = Field(default_factory=Listing)
     cover_art: list[CoverArt] = Field(default_factory=list)  # never overwritten, like page versions
     cover_art_selected: int | None = None  # None: the cover page's line art on the front
+    mosaic: MosaicSettings | None = None  # None: the age group's defaults
     created_at: str
     updated_at: str
 
@@ -144,6 +165,7 @@ class Version(BaseModel):
     background: Background
     instructions: str = ""
     warnings: list[str] = Field(default_factory=list)
+    mosaic: MosaicSettings | None = None  # what a mosaic version was made with
     created_at: str
 
 
@@ -162,6 +184,7 @@ class Page(BaseModel):
     background: Background | None = None  # None: the book's background
     instructions: str = ""
     crop: Crop = Field(default_factory=Crop)
+    mosaic: MosaicSettings | None = None  # None: the book's
     versions: list[Version] = Field(default_factory=list)
     selected: int | None = None  # Version.n shown and exported
     status: Status = "pending"
@@ -170,3 +193,13 @@ class Page(BaseModel):
     @property
     def has_caption(self) -> bool:
         return bool(self.title.strip() or self.subtitle.strip() or self.info.strip())
+
+    @property
+    def selected_version(self) -> Version | None:
+        return next((v for v in self.versions if v.n == self.selected), None)
+
+    @property
+    def is_mosaic(self) -> bool:
+        """Whether the selected version is a mystery mosaic (printed as a puzzle, not line art)."""
+        version = self.selected_version
+        return version is not None and version.engine == "mosaic"
