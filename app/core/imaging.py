@@ -12,11 +12,12 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
+import numpy as np
 from PIL import Image
 
 from app.core import gemini, lineart, mosaic, pages, usage
 from app.core.books import now
-from app.core.schema import Book, Engine, Page, Version
+from app.core.schema import Book, Engine, MosaicSettings, Page, Version
 
 AI_PAGE_COST_USD = 0.14  # estimate shown before converting many pages at once
 BATCH_WORKERS = 3  # AI conversions running at the same time in convert_pages
@@ -171,20 +172,25 @@ class Rendered:
     clean: Image.Image
 
 
+def mosaic_draft(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
+    """The mystery mosaic the page's current settings make, without storing it (previews)."""
+    settings = mosaic.settings_for(book, page)
+    return mosaic.make_grid(pages.cropped_photo(book.slug, page), settings), settings
+
+
 def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
     """Convert a page's (cropped) photo without storing anything. Raises ``gemini.GeminiError``."""
     style = page.style or book.style
     background = page.background or book.background
-    photo = pages.cropped_photo(book.slug, page)
     if engine == "mosaic":
         # Not line art: the grid is stored as data and the solution is already 1-bit.
-        settings = mosaic.settings_for(book, page)
-        grid = mosaic.make_grid(photo, settings)
+        grid, settings = mosaic_draft(book, page)
         version = Version(
             n=0, engine=engine, style=style, age_group=book.age_group, background=background,
             mosaic=settings, created_at=now(),
         )
         return Rendered(page, mosaic.grid_png(grid), version, mosaic.render_solution(grid, settings))
+    photo = pages.cropped_photo(book.slug, page)
     if engine == "gemini":
         prompt = build_prompt(style, book.age_group, background, page.title, page.instructions)
         with usage.book_context(book.id):
@@ -209,14 +215,18 @@ def _store(book: Book, rendered: Rendered) -> Page:
     return pages.add_version(book.slug, rendered.page.id, rendered.version, rendered.raw, rendered.clean)
 
 
-def convert_page(book: Book, page: Page, engine: Engine) -> Page:
+def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = None) -> Page:
     """Convert a page's (cropped) photo and store the result as its new selected version.
 
     ``engine`` is ``"gemini"`` (AI, paid), ``"draft"`` (offline, free) or ``"mosaic"`` (a
-    mystery mosaic, offline, free). Raises
-    ``gemini.GeminiError`` when the AI call fails; nothing is stored in that case.
+    mystery mosaic, offline, free). With ``replace``, that version is deleted once the new
+    one is stored: versions are never overwritten, so the replacement gets the next number.
+    Raises ``gemini.GeminiError`` when the AI call fails; nothing is stored or deleted then.
     """
-    return _store(book, render_page(book, page, engine))
+    stored = _store(book, render_page(book, page, engine))
+    if replace is not None:
+        stored = pages.delete_version(book.slug, page.id, replace)
+    return stored
 
 
 def convert_pages(

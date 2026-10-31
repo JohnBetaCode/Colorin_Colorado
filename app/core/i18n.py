@@ -271,8 +271,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.drafting": {"es": "Dibujando el borrador…", "en": "Drawing the draft…"},
     "wb.mosaic": {"es": "🔳 Monocromo", "en": "🔳 Monochrome"},
     "wb.mosaic_help": {
-        "es": "Mosaico misterioso, sin IA y gratis: la foto en gris se vuelve una cuadrícula tenue con un símbolo en cada casilla; al rellenarlas según la leyenda aparece el dibujo. Ajústalo en «Opciones del monocromo».",
-        "en": "Mystery mosaic, without AI and free: the photo in gray becomes a faint grid with a symbol in every cell; filling them in as the legend says reveals the picture. Adjust it in “Monochrome options”.",
+        "es": "Mosaico misterioso, sin IA y gratis: la foto en gris se vuelve una cuadrícula tenue con un símbolo en cada casilla; al rellenarlas según la leyenda aparece el dibujo. Cada clic crea una versión nueva; para ver las opciones antes o reemplazar la versión actual, abre «Opciones del monocromo».",
+        "en": "Mystery mosaic, without AI and free: the photo in gray becomes a faint grid with a symbol in every cell; filling them in as the legend says reveals the picture. Each click makes a new version; to preview the options or replace the current version, open “Monochrome options”.",
     },
     "wb.mosaic_drawing": {"es": "Armando el mosaico…", "en": "Building the mosaic…"},
     "wb.mosaic_options": {"es": "🔳 Opciones del monocromo", "en": "🔳 Monochrome options"},
@@ -297,6 +297,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Pages you never changed will use these options, also in “Monochrome for all”.",
     },
     "wb.mosaic_made_default": {"es": "Opciones guardadas para todo el libro.", "en": "Options saved for the whole book."},
+    "wb.mosaic_preview": {
+        "es": "Vista previa con estas opciones; aún no se guarda como versión.",
+        "en": "Preview with these options; not saved as a version yet.",
+    },
+    "wb.mosaic_new": {"es": "➕ Guardar como versión nueva", "en": "➕ Save as a new version"},
+    "wb.mosaic_replace": {"es": "🔄 Reemplazar v{n}", "en": "🔄 Replace v{n}"},
+    "wb.mosaic_replace_help": {
+        "es": "Guarda el mosaico con estas opciones y borra la v{n}. Las versiones no se sobrescriben, así que la nueva lleva el número siguiente.",
+        "en": "Saves the mosaic with these options and deletes v{n}. Versions are never overwritten, so the new one gets the next number.",
+    },
+    "wb.mosaic_replaced": {"es": "v{old} reemplazada por v{n}.", "en": "v{old} replaced by v{n}."},
     "wb.mosaic_puzzle": {"es": "Como se imprime", "en": "As printed"},
     "wb.mosaic_solution": {"es": "Solución", "en": "Solution"},
     "wb.mosaic_version": {"es": "{columns} columnas · {tones} tonos", "en": "{columns} columns · {tones} tones"},

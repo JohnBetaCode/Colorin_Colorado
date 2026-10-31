@@ -8,6 +8,7 @@ already on disk when a button in the same rerun converts or approves the page.
 from __future__ import annotations
 
 import streamlit as st
+from PIL import Image
 
 from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates
 from app.core.config import get_settings
@@ -30,6 +31,7 @@ from app.core.schema import (
 from app.ui.common import flash, seed
 
 MIN_CROP = 10  # percent of the photo on each axis
+PREVIEW_PX = 1000  # long side of the mosaic solution shown in the workbench
 # Option meaning "use the book's setting" (stored as None). Not None itself: a selectbox
 # whose state is None shows as empty.
 BOOK_DEFAULT = "book"
@@ -237,22 +239,54 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
         col1, col2 = st.columns(2)
         col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
         col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
+        st.caption(t("wb.mosaic_preview"))
+        _render_mosaic_tabs(book, page, draft=True)
+        col1, col2 = st.columns(2)
+        if col1.button(t("wb.mosaic_new"), type="primary", width="stretch", key=f"mosaic_new_{page.id}"):
+            _convert(book, page, "mosaic")
+        current = page.selected_version
+        if current and current.engine == "mosaic" and col2.button(
+            t("wb.mosaic_replace", n=current.n), help=t("wb.mosaic_replace_help", n=current.n),
+            width="stretch", key=f"mosaic_replace_{page.id}",
+        ):
+            _convert(book, page, "mosaic", replace=current.n)
         st.button(
             t("wb.mosaic_make_default"), help=t("wb.mosaic_make_default_help"), key=f"mosaic_default_{page.id}",
             on_click=_mosaic_for_book, args=(book, page.id),
         )
 
 
-def _convert(book: Book, page: Page, engine: Engine) -> None:
+@st.cache_data(max_entries=16, show_spinner=False)
+def _mosaic_images(book_json: str, page_json: str, draft: bool) -> tuple[Image.Image, Image.Image]:
+    """The mosaic as printed and its solution: the selected version's, or with ``draft`` the one
+    the current options make. Keyed by the saved book and page, so each change renders once."""
+    book, page = Book.model_validate_json(book_json), Page.model_validate_json(page_json)
+    grid, settings = imaging.mosaic_draft(book, page) if draft else export.mosaic_of(book, page)
+    solution = mosaic.render_solution(grid, settings).convert("L")
+    solution.thumbnail((PREVIEW_PX, PREVIEW_PX))
+    return export.mosaic_preview(book, page, grid, settings), solution
+
+
+def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
+    printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
+    puzzle_tab, solution_tab = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
+    puzzle_tab.image(printed, width="stretch")
+    solution_tab.image(solution, width="stretch")
+
+
+def _convert(book: Book, page: Page, engine: Engine, replace: int | None = None) -> None:
     spinner = {"gemini": "wb.converting", "draft": "wb.drafting", "mosaic": "wb.mosaic_drawing"}[engine]
     with st.spinner(t(spinner)):
         try:
-            updated = imaging.convert_page(book, page, engine)
+            updated = imaging.convert_page(book, page, engine, replace=replace)
         except gemini.GeminiError as exc:
             st.error(t("wb.failed", error=exc))
             return
     st.session_state.pop(f"version_{page.id}", None)
-    flash("success", t("wb.converted", n=updated.selected))
+    if replace is None:
+        flash("success", t("wb.converted", n=updated.selected))
+    else:
+        flash("success", t("wb.mosaic_replaced", old=replace, n=updated.selected))
     st.rerun()
 
 
@@ -360,9 +394,7 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
     st.markdown(f"#### {t('wb.coloring_page')} · {t(f'status.{page.status}')}")
     path = pages.selected_path(book.slug, page)
     if path and page.is_mosaic:
-        puzzle, solution = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
-        puzzle.image(export.mosaic_preview(book, page), width="stretch")
-        solution.image(str(path), width="stretch")
+        _render_mosaic_tabs(book, page, draft=False)
         st.caption(t("wb.mosaic_hidden"))
     elif path:
         st.image(str(path), width="stretch")

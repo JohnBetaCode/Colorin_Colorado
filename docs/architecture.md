@@ -109,7 +109,11 @@ and get different tones, so flat areas stay square and edges get a diagonal.
 The grid is stored as an RGB PNG, one pixel per cell (tone of the cell or first triangle, tone of
 the second triangle, split), and `v<n>.png` is the solution rendered through pdfium and dithered
 to 1 bit; `lineart.clean` is skipped. Settings: the page's, else the book's ("Use for the whole
-book"), else `AGE_DEFAULTS`; each version records the ones it was made with.
+book"), else `AGE_DEFAULTS`; each version records the ones it was made with. The options panel
+previews the mosaic the current settings make (`imaging.mosaic_draft`, cached in the UI by the
+saved book and page) before anything is stored, and can save it as a new version or replace the
+selected mosaic version (`convert_page(..., replace=n)`: store, then delete `n`, so the
+replacement takes the next number).
 
 In the PDF a mosaic page has no title, caption or photo: "Mystery N", the instructions, the grid
 and a symbol per cell or triangle in light gray vectors, and a legend (symbol → pencil gray or pen

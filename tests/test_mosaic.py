@@ -80,6 +80,24 @@ def test_mosaic_engine_stores_the_grid_and_a_one_bit_solution(photo):
         assert solution.mode == "1"
 
 
+def test_preview_matches_what_saving_stores(photo):
+    book = _mosaic_book(photo)
+    page = pages.load_pages(book.slug)[1]
+    draft, settings = imaging.mosaic_draft(book, page)
+    stored, stored_settings = export.mosaic_of(book, page)
+    assert (draft == stored).all() and settings == stored_settings
+    assert export.mosaic_preview(book, page, draft, settings).mode == "RGB"
+
+
+def test_replace_stores_the_new_options_under_the_next_number(photo):
+    book = _mosaic_book(photo)
+    page = pages.update_page(book.slug, pages.load_pages(book.slug)[0].id, mosaic=MosaicSettings(columns=12, tones=2))
+    page = imaging.convert_page(book, page, "mosaic", replace=page.selected)
+    assert [v.n for v in page.versions] == [2] and page.selected == 2
+    assert page.selected_version.mosaic.columns == 12
+    assert not pages.version_path(book.slug, page.id, 1).exists()
+
+
 def test_pdf_hides_the_answer_and_adds_the_solutions(photo):
     book = _mosaic_book(photo)
     included = export.preflight(book).included

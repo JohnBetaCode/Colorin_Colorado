@@ -22,6 +22,7 @@ from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import numpy as np
 import pypdfium2 as pdfium
 from PIL import Image
 from reportlab.lib import colors
@@ -37,7 +38,7 @@ from reportlab.platypus import Paragraph
 
 from app.core import extras, i18n, mosaic, pages
 from app.core.books import book_path
-from app.core.schema import Book, Page
+from app.core.schema import Book, MosaicSettings, Page
 
 PAGE_SIZES = {"letter": LETTER, "a4": A4, "8x10": (8 * inch, 10 * inch), "square": (8.5 * inch, 8.5 * inch)}
 MARGIN = 0.5 * inch  # also KDP's minimum inside margin up to 300 pages (kdp.MAX_PAGES)
@@ -380,7 +381,16 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
     c.showPage()
 
 
-def _draw_mosaic_sheet(c: Canvas, book: Book, page: Page, number: int, mystery: int, layout: Layout, fonts: Fonts) -> None:
+def mosaic_of(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
+    """The grid and settings of the page's selected (mosaic) version."""
+    version = page.selected_version
+    grid = mosaic.load_grid(pages.version_path(book.slug, page.id, version.n, raw=True))
+    return grid, version.mosaic or mosaic.default_settings(book.age_group)
+
+
+def _draw_mosaic_sheet(
+    c: Canvas, book: Book, grid: np.ndarray, settings: MosaicSettings, number: int, mystery: int, layout: Layout, fonts: Fonts
+) -> None:
     """A mystery mosaic: its number and how to play, the faint grid, and the legend.
 
     No title and no reference photo, which would give the picture away: both are on the
@@ -396,9 +406,6 @@ def _draw_mosaic_sheet(c: Canvas, book: Book, page: Page, number: int, mystery: 
     c.drawCentredString(x + w / 2, top - 36, extras.label("pdf.mosaic_hint", book))
     legend_h = mosaic.legend_height(book.languages)
     grid_box = (x, y + legend_h + GAP, w, h - 44 - legend_h - 2 * GAP)
-    version = page.selected_version
-    settings = version.mosaic or mosaic.default_settings(book.age_group)
-    grid = mosaic.load_grid(pages.version_path(book.slug, page.id, version.n, raw=True))
     mosaic.draw_puzzle(c, grid, settings, grid_box, fonts.regular)
     mosaic.draw_legend(c, settings, (x, y, w, legend_h), fonts, book.languages)
 
@@ -488,7 +495,7 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
         if isinstance(sheet, Page):
             number += 1
             if sheet.is_mosaic:
-                _draw_mosaic_sheet(c, book, sheet, number, mysteries[sheet.id], layout, fonts)
+                _draw_mosaic_sheet(c, book, *mosaic_of(book, sheet), number, mysteries[sheet.id], layout, fonts)
             else:
                 _draw_sheet(c, book, sheet, number, layout, fonts)
         elif sheet == "title":
@@ -506,15 +513,16 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
     return path
 
 
-def mosaic_preview(book: Book, page: Page, dpi: int = 100) -> Image.Image:
-    """The page's mystery mosaic as it will print, for the workbench."""
+def mosaic_preview(book: Book, page: Page, grid: np.ndarray, settings: MosaicSettings, dpi: int = 100) -> Image.Image:
+    """A mystery mosaic of the page as it will print, for the workbench: its stored grid or
+    one not saved yet."""
     layout = _layout(book)
     fonts = load_fonts()
     buffer = BytesIO()
     c = Canvas(buffer, pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
-    included = [p for p in pages.load_pages(book.slug) if p.in_book and p.is_mosaic]
+    included = [p for p in pages.load_pages(book.slug) if p.in_book and (p.is_mosaic or p.id == page.id)]
     mystery = next((n for n, p in enumerate(included, start=1) if p.id == page.id), 1)
-    _draw_mosaic_sheet(c, book, page, 0, mystery, layout, fonts)
+    _draw_mosaic_sheet(c, book, grid, settings, 0, mystery, layout, fonts)
     c.save()
     pdf = pdfium.PdfDocument(buffer.getvalue())
     try:
