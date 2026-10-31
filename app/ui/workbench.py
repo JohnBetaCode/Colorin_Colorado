@@ -7,6 +7,8 @@ already on disk when a button in the same rerun converts or approves the page.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import streamlit as st
 from PIL import Image
 
@@ -251,26 +253,19 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
             help=t("wb.mosaic_columns_help", max=mosaic.MAX_COLUMNS["diagonal"]),
             key=f"mosaic_columns_{page.id}", **save,
         )
-        col1, col2 = st.columns(2)
-        col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
-        col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
         st.checkbox(
             t("wb.mosaic_number_white"), help=t("wb.mosaic_number_white_help"),
             key=f"mosaic_number_white_{page.id}", **save,
         )
+        col1, col2 = st.columns(2)
+        col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
+        col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
+        # The preview right under the sliders, so moving them shows the result at once; the
+        # SAM2 points, which take room, go last.
         installed = background.available()
-        st.checkbox(
-            t("wb.mosaic_remove_background"),
-            help=t("wb.mosaic_remove_background_help", mb=background.MODEL_MB) if installed else t("wb.sam_missing"),
-            disabled=not installed, key=f"mosaic_remove_background_{page.id}", **save,
-        )
-        ready = True
         if settings.remove_background and not installed:
             st.warning(t("wb.sam_missing"))
-            ready = False
-        elif settings.remove_background:
-            ready = _render_subject(book, page, settings)
-        if ready:
+        else:
             st.caption(t("wb.mosaic_preview"))
             _render_mosaic_tabs(book, page, draft=True)
         col1, col2 = st.columns(2)
@@ -286,6 +281,14 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
             t("wb.mosaic_make_default"), help=t("wb.mosaic_make_default_help"), key=f"mosaic_default_{page.id}",
             on_click=_mosaic_for_book, args=(book, page.id),
         )
+        st.divider()
+        st.checkbox(
+            t("wb.mosaic_remove_background"),
+            help=t("wb.mosaic_remove_background_help", mb=background.MODEL_MB) if installed else t("wb.sam_missing"),
+            disabled=not installed, key=f"mosaic_remove_background_{page.id}", **save,
+        )
+        if settings.remove_background and installed:
+            _render_subject(book, page, settings)
 
 
 @st.cache_data(max_entries=16, show_spinner=False)
@@ -309,16 +312,14 @@ def _subject_outline(book_json: str, page_json: str) -> Image.Image:
     return image
 
 
-def _render_subject(book: Book, page: Page, settings: MosaicSettings) -> bool:
-    """SAM2's cut, with the points it was made from; a click adds a point. False (with the
-    error shown) when SAM2 cannot cut."""
-    first = not background.model_downloaded()
-    with st.spinner(t("wb.sam_downloading", mb=background.MODEL_MB) if first else t("wb.sam_working")):
-        try:
+def _render_subject(book: Book, page: Page, settings: MosaicSettings) -> None:
+    """SAM2's cut, with the points it was made from; a click adds a point. When SAM2 cannot
+    cut, the preview above already shows why."""
+    try:
+        with _sam_spinner():
             image = _subject_outline(book.model_dump_json(), page.model_dump_json())
-        except background.BackgroundError as exc:
-            st.error(t("wb.sam_failed", error=exc))
-            image = None
+    except background.BackgroundError:
+        image = None
     st.caption(t("wb.mosaic_points_help"))
     if image is not None:
         shown = [p.model_dump() for p in background.hints(settings)]
@@ -335,11 +336,21 @@ def _render_subject(book: Book, page: Page, settings: MosaicSettings) -> bool:
         t("wb.mosaic_points_clear"), width="stretch", disabled=not settings.points,
         key=f"points_clear_{page.id}", on_click=_drop_points, args=(book.slug, page.id),
     )
-    return image is not None
+
+
+def _sam_spinner():
+    first = not background.model_downloaded()
+    return st.spinner(t("wb.sam_downloading", mb=background.MODEL_MB) if first else t("wb.sam_working"))
 
 
 def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
-    printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
+    sam = draft and mosaic.settings_for(book, page).remove_background
+    try:
+        with _sam_spinner() if sam else nullcontext():
+            printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
+    except background.BackgroundError as exc:
+        st.error(t("wb.sam_failed", error=exc))
+        return
     puzzle_tab, solution_tab = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
     puzzle_tab.image(printed, width="stretch")
     solution_tab.image(solution, width="stretch")
