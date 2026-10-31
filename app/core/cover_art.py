@@ -10,10 +10,11 @@ records which one the cover uses.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageCms
 
 from app.core import books, gemini, lineart, pages, usage
 from app.core.books import book_path, now
@@ -23,7 +24,9 @@ MAX_PX = 6000  # uploads are downscaled to this on the long side
 JPEG_QUALITY = 95
 ASPECT_RATIO = "3:4"  # closest to a portrait front cover
 IMAGE_SIZE = "4K"  # 3584 × 4800 at 3:4: over 400 ppi on an 11 in cover
-MAX_COLLAGE_PAGES = 6  # each sends two references (line art and photo); the model takes 14
+MAX_COLLAGE_PAGES = 6
+# Ghostscript's default CMYK profile (coated paper, SWOP-like), from libgs-common in the image.
+CMYK_PROFILE = Path("/usr/share/color/icc/ghostscript/default_cmyk.icc")  # each sends two references (line art and photo); the model takes 14
 
 COVER_RULES = """Rules:
 - Full color, bright and cheerful, clean shapes, made to look good in print.
@@ -60,12 +63,33 @@ def print_ppi(size: tuple[int, int], box: tuple[float, float]) -> float:
     return min(size[0] / box[0], size[1] / box[1])
 
 
-def to_cmyk(image: Image.Image) -> Image.Image:
-    """RGB to CMYK with full black generation: grays and darks print with black ink only.
+@lru_cache(maxsize=1)
+def _press_transform() -> ImageCms.ImageCmsTransform | None:
+    if not CMYK_PROFILE.exists():
+        return None
+    return ImageCms.buildTransform(
+        ImageCms.createProfile("sRGB"),
+        ImageCms.getOpenProfile(str(CMYK_PROFILE)),
+        "RGB",
+        "CMYK",
+        renderingIntent=ImageCms.Intent.PERCEPTUAL,
+    )
 
-    A plain formula, without a press profile: KDP prints with its own, and a cover only
-    needs colors in the right family, not proof-matched ones.
+
+def to_cmyk(image: Image.Image) -> Image.Image:
+    """RGB to CMYK for print: through the press profile when installed, else ``plain_cmyk``.
+
+    The profile keeps colors closer to the screen and limits the total ink; KDP strips
+    embedded profiles and prints with its own, so none is embedded.
     """
+    transform = _press_transform()
+    if transform is None:
+        return plain_cmyk(image)
+    return ImageCms.applyTransform(image.convert("RGB"), transform)
+
+
+def plain_cmyk(image: Image.Image) -> Image.Image:
+    """RGB to CMYK by formula, with full black generation: grays and darks print with black only."""
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32) / 255
     k = 1 - rgb.max(axis=2)
     room = np.where(k < 1, 1 - k, 1)[..., None]

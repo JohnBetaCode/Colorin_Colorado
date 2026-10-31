@@ -26,13 +26,22 @@ def _book(photo, line_art, n_pages=3):
     return books.load_book(book.slug)
 
 
-def test_to_cmyk_prints_grays_with_black_only():
+def test_plain_cmyk_prints_grays_with_black_only():
     image = Image.fromarray(np.array([[[0, 0, 0], [128, 128, 128], [255, 0, 0], [255, 255, 255]]], dtype=np.uint8))
-    cmyk = np.array(cover_art.to_cmyk(image))[0]
+    cmyk = np.array(cover_art.plain_cmyk(image))[0]
     assert cmyk[0].tolist() == [0, 0, 0, 255]
     assert cmyk[1].tolist() == [0, 0, 0, 127]
     assert cmyk[2].tolist() == [0, 255, 255, 0]
     assert cmyk[3].tolist() == [0, 0, 0, 0]
+
+
+def test_to_cmyk_uses_the_press_profile():
+    assert cover_art.CMYK_PROFILE.exists(), "libgs-common is installed in the Docker image"
+    image = Image.fromarray(np.array([[[255, 255, 255], [220, 30, 30], [0, 0, 0]]], dtype=np.uint8))
+    white, red, black = (np.array(cover_art.to_cmyk(image))[0].astype(int)).tolist()
+    assert sum(white) < 10  # paper stays paper
+    assert red[1] > 180 and red[2] > 150 and red[0] < 60  # magenta and yellow, little cyan
+    assert black[3] > 200 and sum(black) <= 0.82 * 1020  # rich black within a total ink limit
 
 
 def test_uploads_are_versions_and_the_front_can_go_back_to_line_art(photo, line_art):

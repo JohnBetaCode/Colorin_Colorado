@@ -3,8 +3,9 @@ FROM python:3.12-slim
 WORKDIR /workspace
 
 # Andika (SIL), designed for children learning to read, is the typeface of the PDF.
+# libgs-common brings Ghostscript's CMYK press profile, used to convert cover images.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-sil-andika \
+    && apt-get install -y --no-install-recommends fonts-sil-andika libgs-common \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
