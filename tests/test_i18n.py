@@ -2,7 +2,7 @@ import re
 import string
 from pathlib import Path
 
-from app.core import kdp, lineart, mosaic
+from app.core import kdp, lineart, mosaic, tones
 from app.core.config import AUTH_METHODS
 from app.core.i18n import LANGUAGE_NAMES, STRINGS, t
 from app.core.schema import (
@@ -72,6 +72,7 @@ def test_every_option_and_warning_has_a_label():
         "mosaic_cells": MOSAIC_CELLS,
         "pdf.mosaic_tone": {name for names in mosaic.TONE_NAMES.values() for name in names},
         "pdf.mosaic_pattern": {name for names in mosaic.PALETTES.values() for name in names} | {"empty"},
+        "curves": tones.PRESETS,
     }
     missing = [f"{p}.{v}" for p, values in prefixes.items() for v in values if f"{p}.{v}" not in STRINGS]
     assert missing == []

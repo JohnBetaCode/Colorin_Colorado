@@ -10,7 +10,7 @@ from __future__ import annotations
 import streamlit as st
 from PIL import Image
 
-from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates
+from app.core import books, captions, commons, export, gemini, imaging, mosaic, pages, templates, tones
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import (
@@ -28,6 +28,7 @@ from app.core.schema import (
     Version,
 )
 from app.ui.common import flash, seed
+from app.ui.curve_editor import curve_editor
 
 MIN_CROP = 10  # percent of the photo on each axis
 PREVIEW_PX = 1000  # long side of the mosaic solution shown in the workbench
@@ -297,7 +298,7 @@ def _render_photo(book: Book, page: Page) -> None:
     crop = page.crop
     seed(f"crop_x_{page.id}", (round(crop.left * 100), round(crop.right * 100)))
     seed(f"crop_y_{page.id}", (round(crop.top * 100), round(crop.bottom * 100)))
-    with st.expander(t("wb.crop"), expanded=not crop.is_full):
+    with st.expander(t("wb.crop"), expanded=not crop.is_full or page.curve is not None):
         st.caption(t("wb.crop_help"))
         st.slider(
             t("wb.crop_horizontal"),
@@ -315,13 +316,63 @@ def _render_photo(book: Book, page: Page) -> None:
             on_change=_save_crop,
             args=(book.slug, page.id),
         )
-        st.button(
+        col1, col2 = st.columns(2)
+        col1.button(
             t("wb.crop_reset"),
             key=f"crop_reset_{page.id}",
+            width="stretch",
             disabled=crop.is_full,
             on_click=_reset_crop,
             args=(book.slug, page.id),
         )
+        col2.button(
+            t("wb.curves"),
+            key=f"curves_toggle_{page.id}",
+            width="stretch",
+            help=t("wb.curves_help"),
+            on_click=_toggle_curves,
+            args=(page.id,),
+        )
+        if st.session_state.get(f"curves_open_{page.id}"):
+            _render_curves(book, page)
+        elif page.curve is not None:
+            st.caption(t("wb.curves_active"))
+
+
+def _toggle_curves(page_id: str) -> None:
+    key = f"curves_open_{page_id}"
+    st.session_state[key] = not st.session_state.get(key, False)
+
+
+def _set_curve(slug: str, page_id: str, points: list[tuple[int, int]] | None) -> None:
+    """Save the page's curve; the identity is stored as None (the photo as shot)."""
+    points = None if points is None or tones.is_identity(points) else tones.normalized(points)
+    pages.update_page(slug, page_id, curve=points)
+
+
+def _render_curves(book: Book, page: Page) -> None:
+    """The curve over the photo's histogram, quick presets, and the photo before and after."""
+    st.caption(t("wb.curves_editor_help"))
+    plain = pages.cropped_photo(book.slug, page, curve=False)
+    plain.thumbnail((600, 600))
+    points = tones.normalized(page.curve)
+    changed = curve_editor(points, tones.histogram(plain), key=f"curve_{page.id}")
+    if changed is not None:
+        _set_curve(book.slug, page.id, changed)
+        st.rerun()
+    columns = st.columns(len(tones.PRESETS) + 1)
+    for column, (name, preset) in zip(columns, tones.PRESETS.items()):
+        column.button(
+            t(f"curves.{name}"), key=f"curve_{name}_{page.id}", width="stretch",
+            on_click=_set_curve, args=(book.slug, page.id, preset),
+        )
+    columns[-1].button(
+        t("wb.curves_reset"), key=f"curve_reset_{page.id}", width="stretch", disabled=page.curve is None,
+        on_click=_set_curve, args=(book.slug, page.id, None),
+    )
+    before, after = st.columns(2)
+    before.image(plain, caption=t("wb.curves_before"), width="stretch")
+    after.image(tones.apply(plain, page.curve), caption=t("wb.curves_after"), width="stretch")
 
 
 def _render_caption(book: Book, page: Page) -> None:

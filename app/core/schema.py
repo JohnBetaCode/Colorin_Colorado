@@ -171,6 +171,7 @@ class Version(BaseModel):
     age_group: AgeGroup
     background: Background
     instructions: str = ""
+    curve: list[tuple[int, int]] | None = None  # the photo's tone curve when it was converted
     warnings: list[str] = Field(default_factory=list)
     mosaic: MosaicSettings | None = None  # what a mosaic version was made with
     created_at: str
@@ -191,6 +192,7 @@ class Page(BaseModel):
     background: Background | None = None  # None: the book's background
     instructions: str = ""
     crop: Crop = Field(default_factory=Crop)
+    curve: list[tuple[int, int]] | None = None  # tone curve on the photo (tones.py); None: as shot
     mosaic: MosaicSettings | None = None  # None: the book's
     versions: list[Version] = Field(default_factory=list)
     last_version: int = 0  # highest Version.n ever given: a deleted version's number is never reused

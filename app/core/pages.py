@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from app.core import lineart
+from app.core import lineart, tones
 from app.core.books import book_path
 from app.core.schema import Crop, Page, Version
 
@@ -74,15 +74,16 @@ def selected_path(slug: str, page: Page) -> Path | None:
     return path if path.exists() else None
 
 
-def cropped_photo(slug: str, page: Page) -> Image.Image:
-    """The original photo with the page's crop applied."""
+def cropped_photo(slug: str, page: Page, curve: bool = True) -> Image.Image:
+    """The original photo with the page's crop applied and, unless ``curve`` is False, its
+    tone curve: what every engine converts and the PDF shows as the reference photo."""
     image = Image.open(original_path(slug, page)).convert("RGB")
     crop = page.crop
-    if crop.is_full:
-        return image
-    w, h = image.size
-    box = (round(crop.left * w), round(crop.top * h), round(crop.right * w), round(crop.bottom * h))
-    return image.crop(box)
+    if not crop.is_full:
+        w, h = image.size
+        box = (round(crop.left * w), round(crop.top * h), round(crop.right * w), round(crop.bottom * h))
+        image = image.crop(box)
+    return tones.apply(image, page.curve) if curve else image
 
 
 def photo_size(slug: str, page: Page) -> tuple[int, int]:

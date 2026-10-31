@@ -11,6 +11,9 @@ part.
   weight and detail follow the age group; templates for nature, landmarks and family albums
   suggest what each page says.
 - **Convert the whole book at once**, or page by page in the workbench.
+- **Tone curves** on each photo, like GIMP's Curves, with the histogram behind and before/after
+  previews: they shape every conversion (a mosaic depends a lot on them) and the original photo
+  stays untouched.
 - **Versions, never lost.** Every conversion is kept; pick the one you like, and delete the ones
   you don't want (after a confirmation).
 - **A free draft mode** to lay out a book before spending anything.
