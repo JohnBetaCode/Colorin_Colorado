@@ -8,7 +8,7 @@ import streamlit as st
 
 from app.core import books, export
 from app.core.i18n import LANGUAGE_NAMES, t
-from app.core.schema import PAGE_SIZES, Book, Page
+from app.core.schema import EXTRAS, PAGE_SIZES, Book, Page
 from app.ui.common import seed
 
 FIRST_PAGE = "first"  # cover option stored as None; not None itself, which a selectbox shows as empty
@@ -19,6 +19,49 @@ def _save_option(slug: str, field: str) -> None:
     value = st.session_state[f"export_{field}_{slug}"]
     setattr(book, field, None if value == FIRST_PAGE else value)
     books.save_book(book)
+
+
+def _toggle_extra(slug: str, extra: str) -> None:
+    book = books.load_book(slug)
+    chosen = set(book.extras)
+    if st.session_state[f"extra_{extra}_{slug}"]:
+        chosen.add(extra)
+    else:
+        chosen.discard(extra)
+    book.extras = [e for e in EXTRAS if e in chosen]
+    books.save_book(book)
+
+
+def _save_dots_page(slug: str) -> None:
+    book = books.load_book(slug)
+    value = st.session_state[f"export_dots_page_{slug}"]
+    book.dots_page_id = None if value == FIRST_PAGE else value
+    books.save_book(book)
+
+
+def _render_extras(book: Book, report: export.Preflight) -> None:
+    st.markdown(f"##### {t('export.extras')}")
+    st.caption(t("export.extras_help"))
+    col1, col2 = st.columns(2)
+    for i, extra in enumerate(EXTRAS):
+        seed(f"extra_{extra}_{book.slug}", extra in book.extras)
+        (col1 if i % 2 == 0 else col2).checkbox(
+            t(f"extra.{extra}"), key=f"extra_{extra}_{book.slug}", on_change=_toggle_extra, args=(book.slug, extra)
+        )
+    if "dots" in book.extras and report.included:
+        titles = {p.id: p.title.strip() or p.original_name for p in report.included}
+        options = [FIRST_PAGE, *titles]
+        seed(f"export_dots_page_{book.slug}", book.dots_page_id if book.dots_page_id in titles else FIRST_PAGE)
+        st.selectbox(
+            t("export.dots_page"),
+            options,
+            format_func=lambda pid: t("export.dots_auto") if pid == FIRST_PAGE else titles[pid],
+            key=f"export_dots_page_{book.slug}",
+            on_change=_save_dots_page,
+            args=(book.slug,),
+        )
+    for extra in report.extras_missing:
+        st.info(t(f"export.extra_missing.{extra}"))
 
 
 def _names(page_list: list[Page]) -> str:
@@ -65,6 +108,7 @@ def _render_options(book: Book, report: export.Preflight) -> None:
             on_change=_save_option,
             args=(book.slug, field),
         )
+    _render_extras(book, report)
     seed(f"export_legal_{book.slug}", book.legal)
     st.text_area(
         t("export.legal"),

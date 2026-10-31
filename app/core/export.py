@@ -34,7 +34,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
-from app.core import i18n, pages
+from app.core import extras, i18n, pages
 from app.core.books import book_path
 from app.core.schema import Book, Page
 
@@ -57,7 +57,8 @@ MUTED = colors.HexColor("#5b6470")
 # Andika (SIL) is designed for children learning to read; installed in the Docker image.
 _ANDIKA_DIR = Path("/usr/share/fonts/truetype/andika")
 
-# One page of the interior: "title", "legal", "owner", "blank" or a coloring page.
+# One page of the interior: "title", "legal", "owner", "blank", an extra (schema.EXTRAS) or a
+# coloring page.
 Sheet = str | Page
 
 
@@ -76,6 +77,7 @@ class Preflight:
     without_version: list[Page] = field(default_factory=list)
     not_approved: list[Page] = field(default_factory=list)
     overflowing: list[Page] = field(default_factory=list)
+    extras_missing: list[str] = field(default_factory=list)  # chosen extras the pages cannot make
 
 
 def load_fonts() -> Fonts:
@@ -385,6 +387,8 @@ def preflight(book: Book) -> Preflight:
             report.not_approved.append(page)
         if not caption_fits(book, page, fonts):
             report.overflowing.append(page)
+    ready = extras.available(book, report.included)
+    report.extras_missing = [extra for extra in book.extras if extra not in ready]
     return report
 
 
@@ -395,12 +399,18 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
     backs every coloring page is a right-hand page with nothing printed behind it.
     """
     back = ["blank"] if book.blank_backs else []
+    ready = extras.available(book, included)
     order: list[Sheet] = ["title"]
     order += ["legal"] if has_legal_page(book, included) else back
     if book.include_owner_page:
         order += ["owner", *back]
+    if "color_test" in ready:
+        order += ["color_test", *back]
     for page in included:
         order += [page, *back]
+    for extra in ready:
+        if extra != "color_test":
+            order += [extra, *back]
     return order
 
 
@@ -434,7 +444,10 @@ def export_book_pdf(book: Book) -> Path:
             _draw_legal_page(c, book, included, layout, fonts)
         elif sheet == "owner":
             _draw_owner_page(c, book, layout, fonts)
+        elif sheet == "blank":
+            c.showPage()
         else:
+            extras.draw(sheet, c, book, included, fonts, layout.content)
             c.showPage()
     c.save()
     return path

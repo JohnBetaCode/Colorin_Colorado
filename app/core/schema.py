@@ -21,6 +21,9 @@ Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior
 CoverColor = Literal["blue", "green", "orange", "purple", "pink", "teal"]
 ArtMode = Literal["collage", "text", "theme"]  # what an AI cover image is drawn from
 ArtSource = Literal["upload", "collage", "text", "theme"]
+# Extra pages, in the order they are printed: the color test after the owner page, the
+# activities and their solutions after the coloring pages, then the diploma and the closing page.
+Extra = Literal["color_test", "word_search", "maze", "dots", "solutions", "diploma", "closing"]
 # Photo licenses, by what they allow in a book for sale (see docs/amazon-kdp.md).
 License = Literal[
     "unknown", "own", "public_domain", "cc_by", "cc_by_sa", "free_license", "non_commercial", "no_derivatives"
@@ -36,6 +39,7 @@ INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
 COVER_COLORS: tuple[CoverColor, ...] = ("blue", "green", "orange", "purple", "pink", "teal")
 ART_MODES: tuple[ArtMode, ...] = ("collage", "text", "theme")
 ART_SOURCES: tuple[ArtSource, ...] = ("upload", "collage", "text", "theme")
+EXTRAS: tuple[Extra, ...] = ("color_test", "word_search", "maze", "dots", "solutions", "diploma", "closing")
 LICENSES: tuple[License, ...] = (
     "unknown", "own", "public_domain", "cc_by", "cc_by_sa", "free_license", "non_commercial", "no_derivatives"
 )
@@ -68,6 +72,8 @@ class Book(BaseModel):
     include_owner_page: bool = True
     blank_backs: bool = False
     cover_page_id: str | None = None
+    extras: list[Extra] = Field(default_factory=list)
+    dots_page_id: str | None = None  # the page the connect-the-dots is traced from; None: the first that works
     legal: str = ""  # copyright page text: rights, edition, ISBN
     # Amazon KDP: interior ink and list price (cost and royalty estimates), and the wraparound cover.
     kdp_ink: Ink = "black"

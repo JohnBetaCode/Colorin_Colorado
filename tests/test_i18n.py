@@ -12,6 +12,7 @@ from app.core.schema import (
     BACKGROUNDS,
     COVER_COLORS,
     ENGINES,
+    EXTRAS,
     INKS,
     LICENSES,
     PAGE_SIZES,
@@ -57,6 +58,8 @@ def test_every_option_and_warning_has_a_label():
         "art_mode_help": ART_MODES,
         "art_source": ART_SOURCES,
         "license": LICENSES,
+        "extra": EXTRAS,
+        "export.extra_missing": ("word_search", "dots", "solutions"),
     }
     missing = [f"{p}.{v}" for p, values in prefixes.items() for v in values if f"{p}.{v}" not in STRINGS]
     assert missing == []
