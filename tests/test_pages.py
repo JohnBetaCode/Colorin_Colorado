@@ -10,14 +10,14 @@ def _version() -> Version:
 
 
 def test_create_book_and_add_photos(photo):
-    book = books.create_book("Aves de Colombia", style="cartoon")
-    assert book.slug == "aves-de-colombia"
+    book = books.create_book("Aves del jardín", style="cartoon")
+    assert book.slug == "aves-del-jardin"
     assert books.load_book(book.slug).style == "cartoon"
     first = pages.add_photo(book.slug, "tucan.png", photo)
     pages.add_photo(book.slug, "colibri.png", photo)
     assert [p.original_name for p in pages.load_pages(book.slug)] == ["tucan.png", "colibri.png"]
     assert pages.original_path(book.slug, first).exists()
-    assert books.create_book("Aves de Colombia").slug != book.slug
+    assert books.create_book("Aves del jardín").slug != book.slug
 
 
 def test_unreadable_upload_is_rejected():

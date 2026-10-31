@@ -1,17 +1,21 @@
-"""PDF export of a coloring book.
+"""PDF export of a coloring book (the interior, for home printing and for Amazon KDP).
 
 One sheet per coloring page: the line art on top and, when the page has a caption or
 the book shows reference photos, a rounded info box at the bottom with the color
 photo and the caption. Line art is embedded losslessly, so every pixel of it stays
-pure black or pure white; reference photos are re-encoded as bounded JPEGs. No
-Gemini calls are made.
+pure black or pure white, and never below ``PRINT_DPI``; reference photos are
+re-encoded as bounded JPEGs. Every font is embedded, which KDP requires. No Gemini
+calls are made.
 
-Output goes to ``books/<slug>/exports/<slug>-<timestamp>.pdf``.
+Output goes to ``books/<slug>/exports/<slug>-<timestamp>.pdf``. The wraparound KDP
+cover is built by ``cover.py``.
 """
 
 from __future__ import annotations
 
+import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
@@ -35,12 +39,13 @@ from app.core.books import book_path
 from app.core.schema import Book, Page
 
 PAGE_SIZES = {"letter": LETTER, "a4": A4}
-MARGIN = 0.5 * inch
+MARGIN = 0.5 * inch  # also KDP's minimum inside margin up to 300 pages (kdp.MAX_PAGES)
 FOOTER = 0.3 * inch
 BOX_RATIO = 0.24  # share of the content height taken by the info box
 GAP = 0.18 * inch
 PAD = 0.14 * inch
 RADIUS = 10
+PRINT_DPI = 300  # KDP's minimum for images
 PHOTO_MAX_PX = 1200
 PHOTO_JPEG_QUALITY = 85
 # Caption text shrinks in steps (body text 14 pt down to ~9 pt) before it overflows.
@@ -51,6 +56,9 @@ MUTED = colors.HexColor("#5b6470")
 
 # Andika (SIL) is designed for children learning to read; installed in the Docker image.
 _ANDIKA_DIR = Path("/usr/share/fonts/truetype/andika")
+
+# One page of the interior: "title", "legal", "owner", "blank" or a coloring page.
+Sheet = str | Page
 
 
 @dataclass
@@ -70,8 +78,8 @@ class Preflight:
     overflowing: list[Page] = field(default_factory=list)
 
 
-def _fonts() -> Fonts:
-    """Andika when installed (Docker), else Helvetica (Latin-1 only)."""
+def load_fonts() -> Fonts:
+    """Andika when installed (Docker), else Helvetica (Latin-1 only, and not embedded)."""
     names = ["Andika", "Andika-Bold", "Andika-Italic"]
     files = [_ANDIKA_DIR / f"Andika-{style}.ttf" for style in ("Regular", "Bold", "Italic")]
     if not all(f.exists() for f in files):
@@ -82,6 +90,11 @@ def _fonts() -> Fonts:
             pdfmetrics.registerFont(TTFont(name, str(file)))
     pdfmetrics.registerFontFamily(names[0], normal=names[0], bold=names[1], italic=names[2], boldItalic=names[1])
     return Fonts(*names)
+
+
+def fonts_embedded() -> bool:
+    """Whether the PDF embeds its fonts: true with Andika, false with the Helvetica fallback."""
+    return load_fonts().regular != Fonts().regular
 
 
 # --- Geometry ---------------------------------------------------------------------
@@ -132,7 +145,7 @@ def _text_box(info: tuple[float, float, float, float], photo: tuple[float, float
     return left, y + PAD, x + w - PAD * 1.4 - left, h - 2 * PAD
 
 
-# --- Caption text -------------------------------------------------------------------
+# --- Text -------------------------------------------------------------------------
 
 _LABEL_LINE = re.compile(r"^([^:]{1,32}):\s*(.*)$")
 
@@ -149,6 +162,11 @@ def info_markup(text: str) -> str:
     return "<br/>".join(lines)
 
 
+def plain_markup(text: str) -> str:
+    """Escape typed text and keep its line breaks."""
+    return "<br/>".join(escape(line.strip()) for line in text.strip().splitlines())
+
+
 def _caption(page: Page, scale: float, fonts: Fonts) -> list[Paragraph]:
     def style(name: str, font: str, size: float, leading: float, color, space: float = 0) -> ParagraphStyle:
         return ParagraphStyle(name, fontName=font, fontSize=size * scale, leading=leading * scale, textColor=color, spaceBefore=space * scale)
@@ -163,14 +181,30 @@ def _caption(page: Page, scale: float, fonts: Fonts) -> list[Paragraph]:
     return items
 
 
-def _fit_caption(page: Page, width: float, height: float, fonts: Fonts) -> tuple[list[Paragraph], float, bool]:
-    """Largest text scale whose caption fits; returns (paragraphs, total height, fits)."""
+def fit_text(make: Callable[[float], list[Paragraph]], width: float, height: float) -> tuple[list[Paragraph], float, bool]:
+    """Largest of ``TEXT_SCALES`` whose paragraphs fit; returns (paragraphs, total height, fits)."""
     for scale in TEXT_SCALES:
-        items = _caption(page, scale, fonts)
+        items = make(scale)
         total = sum(p.wrap(width, height)[1] + p.getSpaceBefore() for p in items)
         if total <= height:
             return items, total, True
     return items, total, False
+
+
+def draw_text(c: Canvas, items: list[Paragraph], box: tuple[float, float, float, float], top: float) -> None:
+    """Draw paragraphs downwards from ``top``, clipped to ``box``."""
+    x, y, w, h = box
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(x, y, w, h)
+    c.clipPath(clip, stroke=0, fill=0)
+    cursor = top
+    for paragraph in items:
+        cursor -= paragraph.getSpaceBefore()
+        _, ph = paragraph.wrap(w, h)
+        paragraph.drawOn(c, x, cursor - ph)
+        cursor -= ph
+    c.restoreState()
 
 
 def caption_fits(book: Book, page: Page, fonts: Fonts | None = None) -> bool:
@@ -179,15 +213,28 @@ def caption_fits(book: Book, page: Page, fonts: Fonts | None = None) -> bool:
     _, info = _layout(book).boxes(True)
     photo = _photo_box(info, pages.photo_size(book.slug, page)) if book.include_reference_photo else None
     _, _, tw, th = _text_box(info, photo)
-    return _fit_caption(page, tw, th, fonts or _fonts())[2]
+    fonts = fonts or load_fonts()
+    return fit_text(lambda scale: _caption(page, scale, fonts), tw, th)[2]
 
 
 # --- Drawing ---------------------------------------------------------------------
 
 
-def _line_art_reader(path: Path) -> tuple[ImageReader, tuple[int, int]]:
-    image = Image.open(path).convert("L")  # lossless: stays 0/255
-    return ImageReader(image), image.size
+def line_art_image(path: Path, box: tuple[float, float] | None = None) -> Image.Image:
+    """The line art as 8-bit grayscale, which is embedded losslessly: it stays 0/255.
+
+    When fitting it into ``box`` (width, height in points) would print it below
+    ``PRINT_DPI``, it is upsampled smoothly and thresholded again, so curves stay
+    smooth and every pixel is still pure black or pure white.
+    """
+    image = Image.open(path).convert("L")
+    if box:
+        points_per_px = min(box[0] / image.width, box[1] / image.height)
+        factor = PRINT_DPI * points_per_px / 72
+        if factor > 1:
+            size = (math.ceil(image.width * factor), math.ceil(image.height * factor))
+            image = image.resize(size, Image.Resampling.LANCZOS).point(lambda v: 255 if v >= 128 else 0)
+    return image
 
 
 def _photo_reader(image: Image.Image) -> tuple[ImageReader, tuple[int, int]]:
@@ -199,14 +246,19 @@ def _photo_reader(image: Image.Image) -> tuple[ImageReader, tuple[int, int]]:
     return ImageReader(buffer), image.size
 
 
-def _draw_fitted(c: Canvas, reader: ImageReader, size: tuple[int, int], box: tuple[float, float, float, float]) -> None:
+def draw_fitted(c: Canvas, reader: ImageReader, size: tuple[int, int], box: tuple[float, float, float, float]) -> None:
     x, y, w, h = box
     scale = min(w / size[0], h / size[1])
     dw, dh = size[0] * scale, size[1] * scale
     c.drawImage(reader, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh)
 
 
-def _centered(c: Canvas, text: str, style: ParagraphStyle, x: float, top: float, width: float) -> float:
+def draw_line_art(c: Canvas, path: Path, box: tuple[float, float, float, float]) -> None:
+    image = line_art_image(path, box[2:])
+    draw_fitted(c, ImageReader(image), image.size, box)
+
+
+def centered(c: Canvas, text: str, style: ParagraphStyle, x: float, top: float, width: float) -> float:
     """Draw a centered paragraph whose top is at ``top``; returns its bottom."""
     paragraph = Paragraph(escape(text), style)
     _, h = paragraph.wrap(width, 10_000)
@@ -220,15 +272,16 @@ def _frame(c: Canvas, layout: Layout) -> None:
     c.roundRect(MARGIN, MARGIN, layout.width - 2 * MARGIN, layout.height - 2 * MARGIN, 18)
 
 
-def _draw_cover(c: Canvas, book: Book, cover: Page | None, layout: Layout, fonts: Fonts) -> None:
+def _draw_title_page(c: Canvas, book: Book, cover: Page | None, layout: Layout, fonts: Fonts) -> None:
+    """The first page: the cover when printing at home, the title page in a KDP paperback."""
     _frame(c, layout)
     x, w = MARGIN + PAD * 2, layout.width - 2 * (MARGIN + PAD * 2)
     top = layout.height - MARGIN - 0.6 * inch
     title = ParagraphStyle("cover_title", fontName=fonts.bold, fontSize=34, leading=40, alignment=TA_CENTER, textColor=INK)
-    bottom = _centered(c, book.title, title, x, top, w)
+    bottom = centered(c, book.title, title, x, top, w)
     if book.subtitle.strip():
         subtitle = ParagraphStyle("cover_subtitle", fontName=fonts.italic, fontSize=16, leading=20, alignment=TA_CENTER, textColor=MUTED)
-        bottom = _centered(c, book.subtitle.strip(), subtitle, x, bottom - 8, w)
+        bottom = centered(c, book.subtitle.strip(), subtitle, x, bottom - 8, w)
     floor = MARGIN + 0.5 * inch
     if book.dedication.strip():
         dedication = ParagraphStyle("dedication", fontName=fonts.italic, fontSize=13, leading=17, alignment=TA_CENTER, textColor=MUTED)
@@ -238,8 +291,39 @@ def _draw_cover(c: Canvas, book: Book, cover: Page | None, layout: Layout, fonts
         floor += h + 0.2 * inch
     art = pages.selected_path(book.slug, cover) if cover else None
     if art:
-        reader, size = _line_art_reader(art)
-        _draw_fitted(c, reader, size, (x, floor, w, bottom - 0.3 * inch - floor))
+        draw_line_art(c, art, (x, floor, w, bottom - 0.3 * inch - floor))
+    c.showPage()
+
+
+def _credits(included: list[Page]) -> list[tuple[int, Page]]:
+    """Coloring pages with a photo credit, with their printed page number."""
+    return [(n, page) for n, page in enumerate(included, start=1) if page.credit.strip()]
+
+
+def _legal(book: Book, included: list[Page], scale: float, fonts: Fonts) -> list[Paragraph]:
+    body = ParagraphStyle("legal", fontName=fonts.regular, fontSize=10 * scale, leading=13 * scale, textColor=INK)
+    items = []
+    if book.legal.strip():
+        items.append(Paragraph(plain_markup(book.legal), body))
+    credits = _credits(included)
+    if credits:
+        heading = ParagraphStyle("credits", parent=body, fontName=fonts.bold, spaceBefore=(16 if items else 0) * scale)
+        items.append(Paragraph(escape(i18n.t("pdf.photo_credits", lang=book.language)), heading))
+        for number, page in credits:
+            line = i18n.t("pdf.credit_line", lang=book.language, n=number, title=page.title.strip() or page.original_name, credit=page.credit.strip())
+            items.append(Paragraph(escape(line), body))
+    return items
+
+
+def has_legal_page(book: Book, included: list[Page]) -> bool:
+    return bool(book.legal.strip() or _credits(included))
+
+
+def _draw_legal_page(c: Canvas, book: Book, included: list[Page], layout: Layout, fonts: Fonts) -> None:
+    """Copyright page: the book's legal text and the photo credits, at the foot of the page."""
+    x, y, w, h = layout.content
+    items, total, fits = fit_text(lambda scale: _legal(book, included, scale, fonts), w, h)
+    draw_text(c, items, (x, y, w, h), y + total if fits else y + h)
     c.showPage()
 
 
@@ -247,7 +331,7 @@ def _draw_owner_page(c: Canvas, book: Book, layout: Layout, fonts: Fonts) -> Non
     _frame(c, layout)
     x, w = MARGIN + PAD * 2, layout.width - 2 * (MARGIN + PAD * 2)
     style = ParagraphStyle("owner", fontName=fonts.bold, fontSize=26, leading=32, alignment=TA_CENTER, textColor=INK)
-    bottom = _centered(c, i18n.t("pdf.owner", lang=book.language), style, x, layout.height * 0.6, w)
+    bottom = centered(c, i18n.t("pdf.owner", lang=book.language), style, x, layout.height * 0.6, w)
     c.setStrokeColor(INK)
     c.setLineWidth(1.5)
     c.line(x + w * 0.12, bottom - 0.9 * inch, x + w * 0.88, bottom - 0.9 * inch)
@@ -256,8 +340,7 @@ def _draw_owner_page(c: Canvas, book: Book, layout: Layout, fonts: Fonts) -> Non
 
 def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, fonts: Fonts) -> None:
     art_box, info = layout.boxes(_shows_info(book, page))
-    reader, size = _line_art_reader(pages.selected_path(book.slug, page))
-    _draw_fitted(c, reader, size, art_box)
+    draw_line_art(c, pages.selected_path(book.slug, page), art_box)
 
     if info:
         c.setStrokeColor(INK)
@@ -272,18 +355,8 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
             c.rect(*photo)
         if page.has_caption:
             tx, ty, tw, th = _text_box(info, photo)
-            items, total, fits = _fit_caption(page, tw, th, fonts)
-            c.saveState()
-            clip = c.beginPath()
-            clip.rect(tx, ty, tw, th)
-            c.clipPath(clip, stroke=0, fill=0)
-            cursor = ty + th - (th - total) / 2 if fits else ty + th
-            for paragraph in items:
-                cursor -= paragraph.getSpaceBefore()
-                _, h = paragraph.wrap(tw, th)
-                paragraph.drawOn(c, tx, cursor - h)
-                cursor -= h
-            c.restoreState()
+            items, total, fits = fit_text(lambda scale: _caption(page, scale, fonts), tw, th)
+            draw_text(c, items, (tx, ty, tw, th), ty + th - (th - total) / 2 if fits else ty + th)
 
     c.setFont(fonts.regular, 10)
     c.setFillColor(MUTED)
@@ -300,7 +373,7 @@ def exports_dir(book: Book) -> Path:
 
 def preflight(book: Book) -> Preflight:
     report = Preflight()
-    fonts = _fonts()
+    fonts = load_fonts()
     for page in pages.load_pages(book.slug):
         if not page.in_book:
             continue
@@ -315,13 +388,29 @@ def preflight(book: Book) -> Preflight:
     return report
 
 
+def sheets(book: Book, included: list[Page]) -> list[Sheet]:
+    """Every page of the interior, in print order.
+
+    The copyright page, when there is one, is the back of the title page. With blank
+    backs every coloring page is a right-hand page with nothing printed behind it.
+    """
+    back = ["blank"] if book.blank_backs else []
+    order: list[Sheet] = ["title"]
+    order += ["legal"] if has_legal_page(book, included) else back
+    if book.include_owner_page:
+        order += ["owner", *back]
+    for page in included:
+        order += [page, *back]
+    return order
+
+
 def export_book_pdf(book: Book) -> Path:
     """Build the PDF and return its path. Pages without a coloring page are skipped."""
     included = preflight(book).included
     if not included:
         raise ValueError("No coloring pages to export yet.")
     layout = _layout(book)
-    fonts = _fonts()
+    fonts = load_fonts()
     cover = next((p for p in included if p.id == book.cover_page_id), included[0])
 
     folder = exports_dir(book)
@@ -329,21 +418,23 @@ def export_book_pdf(book: Book) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     path = folder / f"{book.slug}-{stamp}.pdf"
 
-    c = Canvas(str(path), pagesize=(layout.width, layout.height))
+    # ReportLab sets the initial font on every page; the default (Helvetica) is never embedded.
+    c = Canvas(str(path), pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
     c.setTitle(book.title)
     c.setCreator("Colorín Colorado")
 
-    def blank_back() -> None:
-        if book.blank_backs:
+    number = 0
+    for sheet in sheets(book, included):
+        if isinstance(sheet, Page):
+            number += 1
+            _draw_sheet(c, book, sheet, number, layout, fonts)
+        elif sheet == "title":
+            _draw_title_page(c, book, cover, layout, fonts)
+        elif sheet == "legal":
+            _draw_legal_page(c, book, included, layout, fonts)
+        elif sheet == "owner":
+            _draw_owner_page(c, book, layout, fonts)
+        else:
             c.showPage()
-
-    _draw_cover(c, book, cover, layout, fonts)
-    blank_back()
-    if book.include_owner_page:
-        _draw_owner_page(c, book, layout, fonts)
-        blank_back()
-    for number, page in enumerate(included, start=1):
-        _draw_sheet(c, book, page, number, layout, fonts)
-        blank_back()
     c.save()
     return path

@@ -5,8 +5,9 @@ The image model is asked for pure line art but is never trusted to deliver it.
 colored areas dropped, large black fills hollowed out to their outline, specks
 removed, lines at least as thick as the age group needs, cropped to the drawing
 with a white margin. When the model returns a photo of a printed page instead of
-the artwork, the page is cut out of the photo first. ``draft`` is the free, offline engine: an OpenCV edge
-drawing of the photo, cleaned the same way.
+the artwork, the page is cut out of the photo first. ``draft`` is the free, offline engine: it
+flattens the photo into a few color areas (mean shift and k-means) whose borders become the lines,
+cleaned the same way.
 """
 
 from __future__ import annotations

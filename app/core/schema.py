@@ -17,6 +17,10 @@ Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4"]
 Engine = Literal["gemini", "draft"]
 Status = Literal["pending", "converted", "approved"]
+Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
+CoverColor = Literal["blue", "green", "orange", "purple", "pink", "teal"]
+ArtMode = Literal["collage", "text", "theme"]  # what an AI cover image is drawn from
+ArtSource = Literal["upload", "collage", "text", "theme"]
 
 STYLES: tuple[Style, ...] = ("realistic", "cartoon")
 AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+")
@@ -24,6 +28,20 @@ BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4")
 ENGINES: tuple[Engine, ...] = ("gemini", "draft")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
+INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
+COVER_COLORS: tuple[CoverColor, ...] = ("blue", "green", "orange", "purple", "pink", "teal")
+ART_MODES: tuple[ArtMode, ...] = ("collage", "text", "theme")
+ART_SOURCES: tuple[ArtSource, ...] = ("upload", "collage", "text", "theme")
+
+
+class CoverArt(BaseModel):
+    """One color front-cover image, uploaded or drawn by the AI: ``cover_art/v<n>.jpg``."""
+
+    n: int
+    source: ArtSource
+    prompt: str = ""  # what the author typed: the description, or extra instructions
+    page_ids: list[str] = Field(default_factory=list)  # pages a collage was drawn from
+    created_at: str
 
 
 class Book(BaseModel):
@@ -41,6 +59,14 @@ class Book(BaseModel):
     include_owner_page: bool = True
     blank_backs: bool = False
     cover_page_id: str | None = None
+    legal: str = ""  # copyright page text: rights, edition, ISBN
+    # Amazon KDP: interior ink and list price (cost and royalty estimates), and the wraparound cover.
+    kdp_ink: Ink = "black"
+    list_price: float = 9.99
+    cover_color: CoverColor = "blue"
+    back_text: str = ""
+    cover_art: list[CoverArt] = Field(default_factory=list)  # never overwritten, like page versions
+    cover_art_selected: int | None = None  # None: the cover page's line art on the front
     created_at: str
     updated_at: str
 
@@ -78,6 +104,7 @@ class Page(BaseModel):
     title: str = ""
     subtitle: str = ""
     info: str = ""
+    credit: str = ""  # who took the photo and its license, printed on the copyright page
     style: Style | None = None  # None: the book's style
     background: Background | None = None  # None: the book's background
     instructions: str = ""

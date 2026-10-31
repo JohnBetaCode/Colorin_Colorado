@@ -1,9 +1,13 @@
 # Colorín Colorado — notes for Claude Code
 
 Streamlit app that turns the user's photos into a printable coloring book: photo → black-and-white
-line art (Gemini on Vertex AI, or an offline draft) → PDF with the reference photo and a caption box
-per page. Sibling of `../Once_Upon_a_Time`, same stack and conventions. Read `README.md` for the
-product, `docs/architecture.md` for modules and data layout, `docs/plan.md` for the phases.
+line art (Gemini, or an offline draft) → PDF with the reference photo and a caption box per page,
+ready to sell as an Amazon KDP paperback with its wraparound cover. Sibling of `../Once_Upon_a_Time`,
+same stack and conventions. Read `README.md` for the product, `docs/architecture.md` for modules and
+data layout, `docs/plan.md` for the phases, `docs/amazon-kdp.md` for everything Amazon.
+
+The product is place-neutral: examples in the README, docs, UI placeholders and tests must not
+name a country or city (the author's own books can be about anything).
 
 ## Conventions
 
@@ -12,17 +16,23 @@ product, `docs/architecture.md` for modules and data layout, `docs/plan.md` for 
 - Business logic goes in `app/core/` and never imports Streamlit; `app/ui/` only calls it and renders.
 - Every Gemini call goes through `app/core/gemini.py` and records usage; wrap book work in
   `usage.book_context(book.id)` (by id, not slug).
-- Every image an engine returns goes through `lineart.clean` before it is stored or shown. Coloring
-  pages are 1-bit; never JPEG-encode line art anywhere (the PDF embeds it losslessly).
+- Every coloring page an engine returns goes through `lineart.clean` before it is stored or shown.
+  Coloring pages are 1-bit; never JPEG-encode line art anywhere (the PDF embeds it losslessly).
 - The uploaded photo is always the reference image of a conversion; never draw a page from text.
-- Versions are append-only (`pages.add_version`); never overwrite `v<n>.png`.
+  Cover art (`cover_art.py`) is the one exception: full color, not cleaned, stored as JPEG, and it
+  may be drawn from text.
+- Versions are append-only (`pages.add_version`, `cover_art`); never overwrite `v<n>.png` or
+  `cover_art/v<n>.jpg`.
 - Streamlit widgets fed from saved data: seed the key with `ui.common.seed` and do not pass
   `value=`/`index=`; keep option labels free of data that changes while the user works. See
   "UI rules" in `docs/architecture.md` for why (lost clicks).
 - `books/`, `data/`, `spike/` and `config/.env` are user data and git-ignored. Never commit them and
-  never put a real GCP project ID in `config/.env.example`.
+  never put a real GCP project ID or API key in `config/.env.example`.
 - When changing a model id (`GEMINI_*`), update `config/.env.example`, the defaults in
   `app/core/config.py`, `PRICING` in `app/core/usage.py`, and the table in `docs/setup.md`.
+- Amazon KDP numbers (sizes, page ranges, costs, royalties) live in `app/core/kdp.py`, with their
+  sources in `docs/amazon-kdp.md`; change them together, and `tests/test_kdp.py`. The interior PDF
+  must keep every font embedded and line art at 300 ppi or more.
 - Prompt changes: re-run `scripts/spike.py` on the affected cases (`--jobs`), look at the contact
   sheets, and record what changed in `docs/spike.md`. Cleanup changes can be checked for free with
   `--reclean`.

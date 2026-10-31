@@ -8,7 +8,9 @@ Each book lives in its own folder under ``books/`` (git-ignored):
         originals/<page-id>.jpg         uploaded photo (rotated, downscaled)
         lineart/<page-id>/v<n>-raw.png  model output, untouched
         lineart/<page-id>/v<n>.png      1-bit cleaned coloring page
+        cover_art/v<n>.jpg              front cover image for the KDP cover
         exports/<slug>-<timestamp>.pdf  one file per build
+        exports/covers/<slug>-cover-<pages>p-<timestamp>.pdf
 """
 
 from __future__ import annotations

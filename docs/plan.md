@@ -23,15 +23,16 @@ stack, same conventions, and as much of its code as fits.
 5. **Export the book as a PDF**: cover, "this book belongs to" page, and one coloring page per
    sheet with the color reference photo and the caption in a box at the bottom.
 
-**Not in v1:** accounts or multi-user, public hosting, print-on-demand integrations, coloring pages
-generated from text only (there is always a source photo), mobile layout.
+**Not in v1:** accounts or multi-user, public hosting, coloring pages generated from text only
+(there is always a source photo), mobile layout. Print-on-demand was out of v1 too; Amazon KDP files
+came right after the MVP (see Decisions).
 
 ## Example books
 
 | Book | Photo | Style | Info box |
 |---|---|---|---|
-| Birds of Colombia | A toucan on a branch | Realistic | Name, scientific name, where it lives, one fun fact |
-| Famous places of Colombia | Caño Cristales | Cartoon | Small real photo, what you are coloring, where it is |
+| Birds of the rainforest | A toucan on a branch | Realistic | Name, scientific name, where it lives, one fun fact |
+| Famous landmarks | A church on a bridge over a canyon | Cartoon | Small real photo, what you are coloring, where it is |
 | Family album | The dog at the park | Cartoon | Name and a line about the day |
 
 ## What we reuse from Once Upon a Time
@@ -53,7 +54,7 @@ order), `core/captions.py` (AI caption suggestions, phase 2).
 
 ## Stack
 
-Python 3.12, Streamlit, `google-genai` on Vertex AI with Application Default Credentials,
+Python 3.12, Streamlit, `google-genai` on Vertex AI with Application Default Credentials (or an API key),
 Pydantic 2, Pillow (+ `pillow-heif` for iPhone photos), OpenCV headless + NumPy for the line-art
 cleanup, ReportLab for the PDF, Docker Compose. No database: one folder of JSON and images per
 book, as in Once Upon a Time.
@@ -170,13 +171,23 @@ Pydantic models (`core/schema.py`):
 
 Versions are never overwritten; regenerating adds `v2`, `v3`... and selects the newest.
 
+As built, `Book` has no `layout` yet (facing pages are phase 3) and has a default `background`;
+the page's version is `Page.selected`; `Version` keeps its `background` and `instructions` but no
+prompt hash or file names (they follow from `n`); and the *New book* form asks for title, subtitle,
+style, age group and language only (dedication is in ✏️ Edit book, page size in 📄 Export PDF). After the MVP, `Book` gained the copyright page text
+(`legal`), the KDP settings (`kdp_ink`, `list_price`, `cover_color`, `back_text`) and its cover
+images (`cover_art`, `cover_art_selected`), and `Page` gained `crop` and the photo `credit`. See
+`app/core/schema.py`.
+
 ## PDF layout
 
-Letter (*carta*, what people print on in Colombia) by default, A4 as an option. Line art is
-placed at 300 DPI; reference photos are re-encoded as bounded JPEGs to keep the file small.
+Letter (8.5 × 11 in, the usual home paper in the Americas and the usual Amazon KDP size for
+coloring books) by default, A4 as an option. Line art is placed at 300 DPI or more; reference
+photos are re-encoded as bounded JPEGs to keep the file small.
 
-1. **Cover:** title, subtitle, the chosen cover page as line art (the cover can be colored too),
-   dedication/author.
+1. **Cover** (the title page in a KDP paperback, whose real cover is a separate file): title,
+   subtitle, the chosen cover page as line art (the cover can be colored too), dedication/author.
+   On its back, the **copyright page** with the photo credits, when there is either.
 2. **Owner page** (optional): "Este libro pertenece a: ______" in a simple frame.
 3. **Coloring pages**, one per sheet:
 
@@ -198,8 +209,8 @@ placed at 300 DPI; reference photos are re-encoded as bounded JPEGs to keep the 
 
    Caption text shrinks to fit the box (down to 9 pt); if it still does not fit, the export panel
    warns before building. A page with no caption and no photo gives the line art the whole sheet.
-4. **Blank backs** (optional): a blank page after each coloring page, for single-sided printing so
-   markers do not bleed through.
+4. **Blank backs** (optional): a blank page after each coloring page, so the book can be printed
+   double-sided (as KDP always does) without markers bleeding into another drawing.
 5. **Facing pages** (phase 3): left page shows the large color photo and the caption, right page
    the coloring page, for duplex printing and binding.
 
@@ -216,8 +227,9 @@ without confirmation.
 
 ## Costs
 
-One conversion is one image generation (`gemini-3-pro-image`, about $0.17 per image measured in the
-[spike](spike.md)). A 20-page book at ~1.5 attempts per page is ~30 images, about **$5**. Caption
+One conversion is one image generation (`gemini-3-pro-image`, about $0.14 per image; the
+[spike](spike.md) logged $0.17 before thinking tokens were priced at the text rate). A 20-page book
+at ~1.5 attempts per page is ~30 images, about **$4**. A 4K cover image is about $0.25. Caption
 suggestions cost cents. The draft engine is free. Every call is recorded in `data/usage.jsonl` and
 attributed to its book, as in Once Upon a Time.
 
@@ -257,9 +269,18 @@ attributed to its book, as in Once Upon a Time.
   region, why it is famous).
 - Print-shop export: bleed and crop marks.
 
+**After the MVP (2026-10-31)**
+
+- Amazon KDP: interior to KDP's specs, copyright page with photo credits, cost and royalty,
+  pre-upload checklist, wraparound cover ([amazon-kdp.md](amazon-kdp.md)).
+- Front cover image: uploaded, or drawn by the AI from a collage of pages, a description or the
+  book's theme.
+- Gemini by API key (Vertex AI or Google AI Studio) besides Google Cloud credentials.
+- Tokens shown next to the cost, per book and in total.
+
 ## MVP acceptance criteria
 
-- Create "Aves de Colombia", upload 10 photos, convert and approve each one, type captions, export
+- Create a bird book, upload 10 photos, convert and approve each one, type captions, export
   a Letter PDF.
 - Every coloring page in the PDF contains only pure black and pure white pixels (checked by a test
   over the exported images).
@@ -280,12 +301,23 @@ run end to end yet.
 |---|---|
 | The model adds gray shading or filled areas | Prompt rules + `lineart.clean()` thresholding + "too much black" warning |
 | Cartoon style loses what makes the subject recognizable (species markings) | The photo is always the reference image; `realistic` is the default for educational books |
-| Photos of children trigger safety filters or person-generation limits on Vertex AI | Spike tests a person photo first; draft engine as fallback; clear error in the UI |
+| Photos of children trigger safety filters or person-generation limits in Gemini | Spike tests a person photo first; draft engine as fallback; clear error in the UI |
 | Big PDFs | 1-bit PNGs compress very well; reference photos are bounded JPEGs |
-| Privacy of family photos | Everything stays local in `books/` (git-ignored); only the photo being converted is sent to Vertex AI |
+| Privacy of family photos | Everything stays local in `books/` (git-ignored); only the photo being converted is sent to Gemini |
 
 ## Decisions
 
 - **2026-10-30, UI language:** Spanish and English, switchable (see [Languages](#languages)).
 - **2026-10-30, name:** *Colorín Colorado*.
 - **2026-10-30, repository visibility:** private.
+- **2026-10-31, Amazon KDP:** the books are meant to be sold as paperbacks on Amazon. The interior
+  PDF follows KDP's specs (embedded fonts, 300 ppi, margins, copyright page with photo credits), and
+  a new view estimates cost and royalty, lists what to fix and builds the wraparound cover. See
+  [amazon-kdp.md](amazon-kdp.md).
+- **2026-10-31, place-neutral:** the product, its docs and its examples name no country or city;
+  the author's own books can be about any place.
+- **2026-10-31, cover art:** the KDP front cover can carry a full-color image, uploaded or drawn by
+  the AI, even from text alone. It is the one image that skips `lineart.clean` and the "always from
+  a photo" rule: it is not a coloring page.
+- **2026-10-31, API keys:** Gemini can be reached with an API key (Vertex AI express or Google AI
+  Studio), for people without a Google Cloud project.

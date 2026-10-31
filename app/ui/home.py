@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from app.core import books, gemini, i18n, pages, usage
-from app.core.config import LANGUAGES, get_settings, save_settings
+from app.core.config import AUTH_METHODS, LANGUAGES, get_settings, save_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, STYLES
 from app.ui.common import language_switch, seed, show_flash
@@ -13,11 +13,18 @@ from app.ui.common import language_switch, seed, show_flash
 
 def _render_settings_panel() -> None:
     settings = get_settings()
-    for field in ("project", "text_location", "image_location", "text_model", "image_model"):
+    for field in ("auth", "api_key", "project", "text_location", "image_location", "text_model", "image_model"):
         seed(f"settings_{field}", getattr(settings, field))
     with st.expander(t("settings.title"), expanded=not settings.configured):
         st.caption(t("settings.help"))
         with st.form("settings_form"):
+            col1, col2 = st.columns(2)
+            auth = col1.selectbox(
+                t("settings.auth"), AUTH_METHODS, format_func=lambda a: t(f"auth.{a}"), key="settings_auth"
+            )
+            api_key = col2.text_input(
+                t("settings.api_key"), type="password", help=t("settings.api_key_help"), key="settings_api_key"
+            )
             col1, col2, col3 = st.columns(3)
             project = col1.text_input(t("settings.project"), key="settings_project")
             text_location = col2.text_input(t("settings.text_location"), key="settings_text_location")
@@ -32,6 +39,8 @@ def _render_settings_panel() -> None:
         if saved or tested:
             save_settings(
                 {
+                    "GEMINI_AUTH": auth,
+                    "GEMINI_API_KEY": api_key.strip(),
                     "GOOGLE_CLOUD_PROJECT": project.strip(),
                     "GOOGLE_CLOUD_LOCATION": text_location.strip(),
                     "GEMINI_IMAGE_LOCATION": image_location.strip(),
@@ -56,17 +65,22 @@ def _render_usage_panel() -> None:
             st.info(t("usage.empty"))
             return
         totals = usage.summarize(entries)
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric(t("usage.calls"), f"{totals['calls']:,}")
         col2.metric(t("usage.images"), f"{totals['images']:,}")
-        col3.metric(t("usage.cost"), f"${totals['cost_usd']:.2f}")
+        col3.metric(
+            t("usage.tokens"),
+            f"{totals['tokens']:,}",
+            help=t("usage.tokens_help", input=totals["input_tokens"], output=totals["output_tokens"]),
+        )
+        col4.metric(t("usage.cost"), f"${totals['cost_usd']:.2f}")
         st.caption(t("usage.note"))
         by_book, by_operation = st.tabs([t("usage.by_book"), t("usage.by_operation")])
         titles = {book.id: book.title for book in books.list_books()}
         with by_book:
             rows = usage.breakdown(entries, "book")
             for row in rows:
-                row["book"] = titles.get(row["book"], row["book"])
+                row["book"] = titles.get(row["book"], t("usage.no_book") if row["book"] == "—" else row["book"])
             st.dataframe(rows, width="stretch", hide_index=True)
         with by_operation:
             st.dataframe(usage.breakdown(entries, "operation"), width="stretch", hide_index=True)

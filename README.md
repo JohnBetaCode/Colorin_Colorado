@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.jpg" alt="Colorín Colorado: a photo of a toucan, its coloring page, and the page being colored in with crayons">
+</p>
+
 # 🖍️ Colorín Colorado
 
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -5,12 +9,12 @@
 ![Gemini](https://img.shields.io/badge/Gemini-image-8E75B2?logo=googlegemini&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-compose%20up-2496ED?logo=docker&logoColor=white)
 
-Turn your own photos into a printable coloring book for kids.
+Turn your own photos into a coloring book for kids, to print at home or to sell on Amazon.
 
 Upload photos, convert them one by one into black-and-white line art, write a line about what
 each page shows, and export a PDF where every coloring page carries the real photo and an info
-box. A bird book shows the real bird and where it lives; a book of famous places in Colombia
-shows a small photo of the place and what you are coloring.
+box. A bird book shows the real bird and where it lives; a book of landmarks shows a small photo
+of the place; a family album shows the day the photo was taken.
 
 > *Colorín colorado, este cuento se ha acabado.* The Spanish line that closes a children's story,
 > the way [Once Upon a Time](https://github.com/JohnBetaCode/Once_Upon_a_Time) opens one.
@@ -36,16 +40,30 @@ the right. Crop, convert, regenerate with instructions, approve, next.
 
 ![Workbench](docs/images/ui-workbench.png)
 
+## Sell it on Amazon
+
+The **🛒 Amazon KDP** view turns the book into the two files Amazon's print-on-demand service asks
+for: an interior that meets KDP's specs, and a wraparound cover (back, spine and front) sized to
+the page count. The front can be one of your coloring pages, an image you upload, or a color
+illustration the AI draws from a collage of your pages, a description, or the book's theme. The
+view also estimates the printing cost and your royalty, and lists what to fix before uploading.
+
+![A KDP cover: the back with two pages, the front with an AI collage of the book's subjects](docs/images/kdp-cover.jpg)
+
 ## What you get
 
 - **Any photos.** JPG, PNG, WebP or HEIC straight from the phone.
 - **Two styles, three ages.** Realistic or cartoon; line weight and detail follow the age group.
-- **Versions, never lost.** Every conversion is kept; pick the one you like.
+- **Versions, never lost.** Every conversion and every cover image is kept; pick the one you like.
 - **A free draft mode** to lay out a book before spending anything.
-- **A print-ready PDF**: cover, "this book belongs to" page, one coloring page per sheet with the
-  reference photo and caption, Letter or A4, optional blank backs for double-sided printing.
+- **A print-ready PDF**: title page, copyright page with the photo credits, "this book belongs
+  to" page, one coloring page per sheet with the reference photo and caption, Letter or A4, and
+  blank backs so markers never bleed into another drawing.
+- **Ready for Amazon KDP**: interior and cover files, cost and royalty, and a pre-upload checklist.
 - **Spanish and English**, for the app and for each book.
-- **Costs in sight.** About $0.17 per AI conversion, tracked per book.
+- **Your choice of access to Gemini**: a Google Cloud project, or just an API key.
+- **Costs in sight.** About $0.14 per AI conversion; the tokens and cost of every call are
+  tracked per book and in total.
 
 ## Try it
 
@@ -56,9 +74,11 @@ http://localhost:8502 and create your first book.
 
 - [Setup](docs/setup.md): requirements, running, configuration, tests, troubleshooting.
 - [User guide](docs/usage.md): a book from start to finish, captions, export options, costs.
+- [Selling on Amazon](docs/amazon-kdp.md): KDP file specs, costs and royalties, AI disclosure,
+  photo rights, taxes and payments.
 - [Architecture](docs/architecture.md): modules, data layout, pipelines, design decisions.
 - [Plan](docs/plan.md) and [line-art spike](docs/spike.md).
 
-Sample photos from Wikimedia Commons: toucan by Bernard Gagnon (CC0), Las Lajas Sanctuary by
-Diego Delso (CC BY-SA 4.0), laughing boy by Basile Morin (CC BY-SA 4.0), girl with pigeons by
-Ken Ketch (CC BY 2.0).
+Sample photos from Wikimedia Commons: toucan by Bernard Gagnon (CC0), laughing boy by Basile Morin
+(CC BY-SA 4.0), girl with pigeons by Ken Ketch (CC BY 2.0). The banner and the cover illustration
+were drawn by Gemini from them.

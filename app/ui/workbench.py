@@ -27,7 +27,9 @@ def _go(page_id: str) -> None:
 
 def _save_field(slug: str, page_id: str, field: str) -> None:
     value = st.session_state[f"{field}_{page_id}"]
-    pages.update_page(slug, page_id, **{field: None if value == BOOK_DEFAULT else value})
+    if field in ("style", "background") and value == BOOK_DEFAULT:
+        value = None
+    pages.update_page(slug, page_id, **{field: value})
 
 
 def _save_crop(slug: str, page_id: str) -> None:
@@ -125,6 +127,15 @@ def _render_caption(book: Book, page: Page) -> None:
     )
     if not export.caption_fits(book, page):
         st.warning(t("wb.caption_too_long"))
+    seed(f"credit_{page.id}", page.credit)
+    st.text_input(
+        t("wb.credit"),
+        placeholder=t("wb.credit_placeholder"),
+        help=t("wb.credit_help"),
+        key=f"credit_{page.id}",
+        on_change=_save_field,
+        args=(book.slug, page.id, "credit"),
+    )
 
 
 def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:

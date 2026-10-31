@@ -2,8 +2,9 @@
 
 Every call made through ``app.core.gemini`` appends one JSON line to
 ``data/usage.jsonl`` with the operation, model, token counts, and an
-APPROXIMATE cost in USD based on public Vertex AI list prices. Treat the
-figures as estimates — the GCP billing console is the source of truth.
+APPROXIMATE cost in USD based on public Gemini list prices (Vertex AI's; AI
+Studio's paid tier is similar). Treat the figures as estimates — your Google
+billing is the source of truth.
 """
 
 from __future__ import annotations
@@ -17,16 +18,17 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parents[2]
 USAGE_FILE = ROOT_DIR / "data" / "usage.jsonl"
 
-# USD per 1M tokens (Vertex AI list prices, approximate).
+# USD per 1M tokens (Gemini list prices on Vertex AI, approximate). "thinking" is the rate for
+# thinking tokens when it differs from "output" (image models bill them as text).
 PRICING = {
     "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
     # Intro pricing through 2026-12-31; doubles to 1.50/7.50 from 2027.
     "gemini-3.8-flash": {"input": 0.75, "output": 3.75},
     "gemini-2.5-flash-image": {"input": 0.30, "output": 30.00},
-    # Image output tokens; ~1120 tokens/image => ~$0.134 per image.
-    "gemini-3-pro-image": {"input": 2.00, "output": 120.00},
-    "gemini-3-pro-image-preview": {"input": 2.00, "output": 120.00},
+    # Image output tokens: 1120 per 1K/2K image (~$0.134), 2000 per 4K image (~$0.24).
+    "gemini-3-pro-image": {"input": 2.00, "output": 120.00, "thinking": 12.00},
+    "gemini-3-pro-image-preview": {"input": 2.00, "output": 120.00, "thinking": 12.00},
 }
 
 # Grounding with Google Search, USD per grounded request (approximate;
@@ -58,13 +60,13 @@ def record(
     """Append one usage entry. Never raises — accounting must not break calls."""
     try:
         input_tokens = int(getattr(usage_metadata, "prompt_token_count", 0) or 0)
-        output_tokens = int(getattr(usage_metadata, "candidates_token_count", 0) or 0) + int(
-            getattr(usage_metadata, "thoughts_token_count", 0) or 0
-        )
+        thinking_tokens = int(getattr(usage_metadata, "thoughts_token_count", 0) or 0)
+        output_tokens = int(getattr(usage_metadata, "candidates_token_count", 0) or 0) + thinking_tokens
         prices = PRICING.get(model, {"input": 0.0, "output": 0.0})
         cost = (
             input_tokens * prices["input"] / 1e6
-            + output_tokens * prices["output"] / 1e6
+            + (output_tokens - thinking_tokens) * prices["output"] / 1e6
+            + thinking_tokens * prices.get("thinking", prices["output"]) / 1e6
             + (WEB_SEARCH_COST_PER_REQUEST if web_search else 0.0)
         )
         entry = {
@@ -73,7 +75,8 @@ def record(
             "operation": operation,
             "model": model,
             "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
+            "output_tokens": output_tokens,  # includes thinking_tokens
+            "thinking_tokens": thinking_tokens,
             "images": images,
             "web_search": web_search,
             "cost_usd": round(cost, 6),
@@ -102,6 +105,7 @@ def summarize(entries: list[dict[str, Any]]) -> dict[str, Any]:
         "calls": len(entries),
         "input_tokens": sum(e.get("input_tokens", 0) for e in entries),
         "output_tokens": sum(e.get("output_tokens", 0) for e in entries),
+        "tokens": sum(e.get("input_tokens", 0) + e.get("output_tokens", 0) for e in entries),
         "images": sum(e.get("images", 0) for e in entries),
         "cost_usd": sum(e.get("cost_usd", 0.0) for e in entries),
     }

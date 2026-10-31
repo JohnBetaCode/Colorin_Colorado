@@ -25,7 +25,7 @@ from app.core import gemini, imaging, lineart, usage
 
 # Scenes keep their setting; single subjects get a simplified one (the book default).
 BACKGROUNDS = {"las-lajas": "keep", "pigeons": "keep"}
-TITLES = {"toucan": "Keel-billed toucan", "las-lajas": "Las Lajas Sanctuary, Ipiales, Colombia"}
+TITLES = {"toucan": "Keel-billed toucan", "las-lajas": "Las Lajas Sanctuary"}
 TILE = 480
 
 

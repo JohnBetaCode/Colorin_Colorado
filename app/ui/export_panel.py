@@ -11,7 +11,6 @@ from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import PAGE_SIZES, Book, Page
 from app.ui.common import seed
 
-
 FIRST_PAGE = "first"  # cover option stored as None; not None itself, which a selectbox shows as empty
 
 
@@ -66,6 +65,16 @@ def _render_options(book: Book, report: export.Preflight) -> None:
             on_change=_save_option,
             args=(book.slug, field),
         )
+    seed(f"export_legal_{book.slug}", book.legal)
+    st.text_area(
+        t("export.legal"),
+        placeholder=t("export.legal_placeholder"),
+        help=t("export.legal_help"),
+        height=100,
+        key=f"export_legal_{book.slug}",
+        on_change=_save_option,
+        args=(book.slug, "legal"),
+    )
     st.caption(t("export.labels", language=LANGUAGE_NAMES[book.language]))
 
 

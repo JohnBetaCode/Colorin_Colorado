@@ -11,14 +11,17 @@ Five free-licensed photos from Wikimedia Commons, chosen to cover the risky case
 | Photo | Why | Author, license |
 |---|---|---|
 | Keel-billed toucan on a branch | Educational bird book; dark subject | Bernard Gagnon, CC0 |
-| Las Lajas Sanctuary, Ipiales | Famous Colombian place; busy landscape | Diego Delso, CC BY-SA 4.0 |
+| Las Lajas Sanctuary | Famous landmark; busy landscape | Diego Delso, CC BY-SA 4.0 |
 | Two dogs on grass | Family photo; small subject, heavy texture | சீதா லெட்சுமி நாராயணன், CC BY-SA 4.0 |
 | Laughing boy | Photo of a child (safety filters) | Basile Morin, CC BY-SA 4.0 |
-| Girl with pigeons in Cali | Crowded scene with a child | Ken Ketch, CC BY 2.0 |
+| Girl with pigeons in a square | Crowded scene with a child | Ken Ketch, CC BY 2.0 |
 
 Each photo in both styles (`realistic`, `cartoon`) and all three age groups: 30 conversions, then a
-second round of 6 with the revised prompt. 39 images in total, about **$6.60** (~$0.17 per image:
-~1,400 output tokens at $120/M).
+second round of 6 with the revised prompt. 39 images in total (the 36 above plus 3 not itemized
+here), about **$6.60** as logged then
+(~$0.17 per image: ~1,400 output tokens, all billed at the image rate of $120/M). The thinking
+tokens in that count are billed at the text rate ($12/M), so the real cost was closer to $0.14 per
+image; `usage.py` prices them that way since 2026-10-31.
 
 ## Findings
 
@@ -43,13 +46,18 @@ keel-billed toucan, the boy is the same boy, Las Lajas keeps its bridge and spir
 pigeons into black blobs. Thickening now stops before areas big enough to color at that age start
 closing up, or the page gets too dark.
 
-**Output resolution is about 1 MP** (1200×896) even when asking for `2K`. The cleanup upscales to
-2400 px before thresholding; lines stay smooth at print size.
+**Output resolution: correction (2026-10-31).** The spike saw about 1 MP (1200×896) even when
+asking for `2K`. That was a bug in `gemini.generate_image`: the model thinks with low-resolution
+draft images (response parts marked `thought`) before the final one, and the client returned the
+first image it found, a draft. It now returns the final image, which has the requested size
+(1792×2400 at `2K`, 3584×4800 at `4K`). Every conversion in this spike, and every page converted
+before the fix, used the draft; the cleanup upscales to 2400 px before thresholding, so they print
+fine, but the prompts were tuned on drafts. Re-running the spike on the final images is pending.
 
 ## Still open
 
 - **Small subjects.** When the subject fills a small part of the photo (the dogs), the model keeps
-  the framing even when told to zoom in. The workbench gets a crop control so the user can frame
+  the framing even when told to zoom in. The workbench has a crop control so the user can frame
   the subject before converting.
 - **Busy scenes at ages 3–5** stay busier than ideal. The page warns; the user can switch the
   background to *remove* or add instructions.

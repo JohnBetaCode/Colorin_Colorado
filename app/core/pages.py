@@ -15,7 +15,7 @@ from PIL import Image
 from pillow_heif import register_heif_opener
 
 from app.core import lineart
-from app.core.books import book_path, now
+from app.core.books import book_path
 from app.core.schema import Crop, Page, Version
 
 register_heif_opener()

@@ -1,4 +1,4 @@
-"""Gemini on Vertex AI client.
+"""Gemini client: Vertex AI or the Gemini Developer API.
 
 All LLM calls go through this module:
   - ``web_research``       — web-grounded query (Google Search grounding).
@@ -6,7 +6,8 @@ All LLM calls go through this module:
   - ``generate_image``     — image generation conditioned on reference images
                              (the uploaded photo -> its coloring page).
 
-Auth: Google Application Default Credentials. Settings: ``config/.env``.
+Auth: Application Default Credentials or an API key (``config.Settings.auth``).
+Settings: ``config/.env``.
 """
 
 from __future__ import annotations
@@ -44,9 +45,13 @@ def _cached_client(location: str) -> genai.Client:
     settings = get_settings()
     if not settings.configured:
         raise GeminiError(
-            "Google Cloud project is not configured. "
-            "Set GOOGLE_CLOUD_PROJECT in config/.env (see Settings panel)."
+            "Gemini is not configured. Set GOOGLE_CLOUD_PROJECT, or an API key, "
+            "in config/.env (see the Settings panel)."
         )
+    if settings.auth == "studio_key":
+        return genai.Client(api_key=settings.api_key)
+    if settings.auth == "vertex_key":
+        return genai.Client(vertexai=True, api_key=settings.api_key)
     return genai.Client(vertexai=True, project=settings.project, location=location)
 
 
@@ -142,7 +147,9 @@ def generate_image(
 ) -> bytes:
     """Generate one image (PNG bytes), optionally conditioned on references.
 
-    ``image_size`` is ``"1K"``, ``"2K"`` or ``"4K"``; 1K and 2K cost the same.
+    ``image_size`` is ``"1K"``, ``"2K"`` or ``"4K"``; 1K and 2K cost the same. The model
+    thinks with low-resolution draft images (parts marked ``thought``) before the final
+    one at the requested size; only the final image is returned.
     """
     settings = get_settings()
     parts: list[types.Part] = [
@@ -168,9 +175,10 @@ def generate_image(
 
         usage.record("image_generation", settings.image_model, response.usage_metadata, images=1)
         candidate = response.candidates[0] if response.candidates else None
-        for part in (candidate.content.parts or []) if candidate and candidate.content else []:
-            if part.inline_data and part.inline_data.data:
-                return part.inline_data.data
+        parts_out = (candidate.content.parts or []) if candidate and candidate.content else []
+        images = [p.inline_data.data for p in parts_out if p.inline_data and p.inline_data.data and not p.thought]
+        if images:
+            return images[-1]
         if candidate and candidate.finish_reason:
             last_error = f"Image generation returned no image (finish reason: {candidate.finish_reason})."
     raise GeminiError(last_error)

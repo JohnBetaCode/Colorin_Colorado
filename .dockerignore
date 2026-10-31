@@ -1,0 +1,7 @@
+# Secrets and user data never go into the image; Compose mounts them at run time.
+config/.env
+books/
+data/
+spike/
+.git/
+**/__pycache__/

@@ -1,4 +1,4 @@
-"""Book workspace: sidebar, and the workbench / pages / export views."""
+"""Book workspace: sidebar, and the workbench / pages / export / Amazon KDP views."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from app.core import books, pages, usage
 from app.core.config import LANGUAGES
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, BACKGROUNDS, STYLES, Book
-from app.ui import export_panel, pages_grid, workbench
+from app.ui import export_panel, kdp_panel, pages_grid, workbench
 from app.ui.common import flash, language_switch, seed, show_flash
 
-VIEWS = ("workbench", "pages", "export")
+VIEWS = ("workbench", "pages", "export", "kdp")
 
 
 def _close_book() -> None:
@@ -28,7 +28,7 @@ def _render_sidebar(book: Book) -> None:
         )
         spend = usage.summarize([e for e in usage.load_entries() if e.get("book") == book.id])
         if spend["calls"]:
-            st.caption(t("book.spend", cost=spend["cost_usd"], images=spend["images"]))
+            st.caption(t("book.spend", cost=spend["cost_usd"], images=spend["images"], tokens=spend["tokens"]))
 
         fields = ("title", "subtitle", "dedication", "style", "age_group", "background", "language")
         for field in fields:
@@ -92,5 +92,7 @@ def render_book(book: Book) -> None:
         pages_grid.render(book, page_list)
     elif view == "export":
         export_panel.render(book)
+    elif view == "kdp":
+        kdp_panel.render(book)
     else:
         workbench.render(book, page_list)
