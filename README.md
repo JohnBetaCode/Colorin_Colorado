@@ -21,8 +21,9 @@ of the place; a family album shows the day the photo was taken.
 
 ## From photo to coloring page
 
-Pick a style (realistic, cartoon, kawaii or mandala) and an age group (3–5, 6–8, 9+, adults). The photo is always the
-reference, so the toucan stays a keel-billed toucan and the boy stays the same boy.
+Pick a style (realistic, cartoon, kawaii or mandala) and an age group (3–5, 6–8, 9+, adults). The
+photo is always the reference, so the toucan stays a keel-billed toucan and the boy stays the same
+boy.
 
 ![Photo, realistic and cartoon coloring pages](docs/images/photo-to-page.jpg)
 
@@ -42,30 +43,6 @@ the right. Crop, convert, regenerate with instructions, approve, next.
 
 ![Workbench](docs/images/ui-workbench.png)
 
-## What you get
-
-- **Any photos.** JPG, PNG, WebP or HEIC straight from the phone, or a Wikimedia Commons link,
-  which brings its author and license along.
-- **Four styles, four ages, four kinds of book.** Realistic, cartoon, kawaii or mandala; line
-  weight and detail follow the age group; templates for nature, landmarks and family albums
-  suggest what each page says.
-- **Convert the whole book at once**, or page by page in the workbench.
-- **Versions, never lost.** Every conversion is kept; pick the one you like.
-- **A free draft mode** to lay out a book before spending anything.
-- **Activities from your own pages**: a word search with the book's words, a maze, a
-  connect-the-dots traced from a drawing, their solutions, a color test page, a diploma and a
-  closing page.
-- **Bilingual books**: every caption in Spanish and English, translated by the AI and editable.
-- **Photo credits**: each photo's author and license, printed on the copyright page.
-- **A print-ready PDF**: title page, copyright page with the photo credits, "this book belongs
-  to" page, one coloring page per sheet with the reference photo and caption, in Letter, A4,
-  8 × 10 or square, with blank backs so markers never bleed into another drawing.
-- **Spanish and English**, for the app and for each book.
-- **Duplicate a book, or move it as a ZIP** to back it up or open it on another computer.
-- **Your choice of access to Gemini**: a Google Cloud project, or just an API key.
-- **Costs in sight.** About $0.14 per AI conversion; the tokens and cost of every call are
-  tracked per book and in total.
-
 ## Try it
 
 The [setup guide](docs/setup.md) gets it running with Docker in a few minutes, then open
@@ -73,17 +50,23 @@ http://localhost:8502 and create your first book.
 
 ## Learn more
 
+- [Features](docs/features.md): everything the app does, and what building it cost.
 - [Setup](docs/setup.md): requirements, running, configuration, tests, troubleshooting.
 - [User guide](docs/usage.md): a book from start to finish, captions, export options, costs.
 - [Architecture](docs/architecture.md): modules, data layout, pipelines, design decisions.
 - [Plan](docs/plan.md) and [line-art spike](docs/spike.md).
 
-## Other notes
+## Contributing
 
-- **Development cost**: building this repository cost about **$8.64** in Gemini calls (54 calls,
-  50 images, 137,355 tokens), mostly the line-art spike. The breakdown is in
-  [docs/development-cost.md](docs/development-cost.md).
+Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to
+set up the project, run the tests and the conventions the code follows.
 
-Sample photos from Wikimedia Commons: toucan by Bernard Gagnon (CC0), laughing boy by Basile Morin
-(CC BY-SA 4.0), girl with pigeons by Ken Ketch (CC BY 2.0). The banner and the cover illustration
-were drawn by Gemini from them.
+## License
+
+The code is released under the [MIT License](LICENSE).
+
+The sample photos come from Wikimedia Commons: toucan by Bernard Gagnon (CC0), laughing boy by
+Basile Morin (CC BY-SA 4.0), girl with pigeons by Ken Ketch (CC BY 2.0). The images in
+`docs/images` made from them keep those licenses, so the ones made from the laughing boy are
+CC BY-SA 4.0. The banner was drawn by Gemini from the toucan. The PDF typeface, Andika, is by SIL
+under the SIL Open Font License; it is installed in the Docker image, not stored in this repository.
