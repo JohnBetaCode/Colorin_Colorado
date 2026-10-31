@@ -23,10 +23,14 @@ of the place; a family album shows the day the photo was taken.
 
 ## From photo to coloring page
 
-Pick a style (realistic or cartoon) and an age group (3–5, 6–8, 9+). The photo is always the
+Pick a style (realistic, cartoon, kawaii or mandala) and an age group (3–5, 6–8, 9+, adults). The photo is always the
 reference, so the toucan stays a keel-billed toucan and the boy stays the same boy.
 
 ![Photo, realistic and cartoon coloring pages](docs/images/photo-to-page.jpg)
+
+Two more styles, kawaii and mandala, and a level with fine lines for teens and adults:
+
+![Kawaii, mandala and realistic for adults](docs/images/more-styles.jpg)
 
 Whatever the model returns, the page that reaches the PDF is pure black and white: copied colors
 are dropped, solid black areas become outlines, lines are thickened for small hands, and a
@@ -46,21 +50,35 @@ The **🛒 Amazon KDP** view turns the book into the two files Amazon's print-on
 for: an interior that meets KDP's specs, and a wraparound cover (back, spine and front) sized to
 the page count. The front can be one of your coloring pages, an image you upload, or a color
 illustration the AI draws from a collage of your pages, a description, or the book's theme. The
-view also estimates the printing cost and your royalty, and lists what to fix before uploading.
+view also estimates the printing cost and your royalty on Amazon.com, Amazon.co.uk or the EU
+stores, lists what to fix before uploading (photo licenses included), drafts the product page
+(description, keywords, categories) and makes the images for it: a 3D mockup and a look inside.
 
 ![A KDP cover: the back with two pages, the front with an AI collage of the book's subjects](docs/images/kdp-cover.jpg)
 
 ## What you get
 
-- **Any photos.** JPG, PNG, WebP or HEIC straight from the phone.
-- **Two styles, three ages.** Realistic or cartoon; line weight and detail follow the age group.
+- **Any photos.** JPG, PNG, WebP or HEIC straight from the phone, or a Wikimedia Commons link,
+  which brings its author and license along.
+- **Four styles, four ages, four kinds of book.** Realistic, cartoon, kawaii or mandala; line
+  weight and detail follow the age group; templates for nature, landmarks and family albums
+  suggest what each page says.
+- **Convert the whole book at once**, or page by page in the workbench.
 - **Versions, never lost.** Every conversion and every cover image is kept; pick the one you like.
 - **A free draft mode** to lay out a book before spending anything.
+- **Activities from your own pages**: a word search with the book's words, a maze, a
+  connect-the-dots traced from a drawing, their solutions, a color test page, a diploma and a
+  closing page.
+- **Bilingual books**: every caption in Spanish and English, translated by the AI and editable.
+- **Photo rights in check**: each photo's license, credits on the copyright page, and photos that
+  cannot be sold flagged before you upload.
 - **A print-ready PDF**: title page, copyright page with the photo credits, "this book belongs
-  to" page, one coloring page per sheet with the reference photo and caption, Letter or A4, and
-  blank backs so markers never bleed into another drawing.
-- **Ready for Amazon KDP**: interior and cover files, cost and royalty, and a pre-upload checklist.
+  to" page, one coloring page per sheet with the reference photo and caption, in Letter, A4,
+  8 × 10 or square, with blank backs so markers never bleed into another drawing.
+- **Ready for Amazon KDP**: interior and cover files, cost and royalty in three stores, a
+  pre-upload checklist, the product page drafted, and images for it.
 - **Spanish and English**, for the app and for each book.
+- **Duplicate a book, or move it as a ZIP** to back it up or open it on another computer.
 - **Your choice of access to Gemini**: a Google Cloud project, or just an API key.
 - **Costs in sight.** About $0.14 per AI conversion; the tokens and cost of every call are
   tracked per book and in total.
@@ -78,6 +96,12 @@ http://localhost:8502 and create your first book.
   photo rights, taxes and payments.
 - [Architecture](docs/architecture.md): modules, data layout, pipelines, design decisions.
 - [Plan](docs/plan.md) and [line-art spike](docs/spike.md).
+
+## Other notes
+
+- **Development cost**: building this repository cost about **$8.64** in Gemini calls (54 calls,
+  50 images, 137,355 tokens), mostly the line-art spike. The breakdown is in
+  [docs/development-cost.md](docs/development-cost.md).
 
 Sample photos from Wikimedia Commons: toucan by Bernard Gagnon (CC0), laughing boy by Basile Morin
 (CC BY-SA 4.0), girl with pigeons by Ken Ketch (CC BY 2.0). The banner and the cover illustration

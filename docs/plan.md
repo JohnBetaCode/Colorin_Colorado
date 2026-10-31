@@ -16,7 +16,7 @@ stack, same conventions, and as much of its code as fits.
 1. **Upload** a batch of photos into a book. Each photo becomes one page.
 2. **Convert page by page** in a workbench: original on the left, coloring page on the right;
    convert, compare versions, regenerate with extra instructions, approve, move to the next one.
-3. **Pick a style** for the book (realistic or cartoon) and an age group. Whatever the style, the
+3. **Pick a style** for the book (realistic or cartoon; kawaii and mandala came later) and an age group. Whatever the style, the
    output is always pure black outlines on white, ready to color.
 4. **Caption every page**: a title, an optional subtitle and a short text the user types (later,
    suggested by AI and edited by the user).
@@ -254,9 +254,9 @@ attributed to its book, as in Once Upon a Time.
 
 **Phase 2**
 
-- AI caption suggestions.
-- **Convert all pending** with a progress bar (synchronous, like Once Upon a Time).
-- ZIP of the PNG pages; delete single versions.
+- AI caption suggestions (translations and the Amazon listing shipped; suggesting facts did not).
+- ~~**Convert all pending** with a progress bar~~: done 2026-10-31, three AI calls at a time.
+- ZIP of the PNG pages; delete single versions. (A ZIP of the whole book shipped instead.)
 - `screenshots` and `usage-report` skills.
 
 (Home thumbnails, the usage panel and the README sample pages shipped in phase 1.)
@@ -264,9 +264,8 @@ attributed to its book, as in Once Upon a Time.
 **Phase 3**
 
 - Facing-pages layout (blank backs shipped in phase 1).
-- More styles (`kawaii`, `mandala`).
-- Book templates with predefined caption fields (birds: name, habitat, fun fact; places: city,
-  region, why it is famous).
+- ~~More styles (`kawaii`, `mandala`)~~: done 2026-10-31, with an adult level.
+- ~~Book templates with predefined caption fields~~: done 2026-10-31 (nature, landmarks, family).
 - Print-shop export: bleed and crop marks.
 
 **After the MVP (2026-10-31)**
@@ -277,6 +276,12 @@ attributed to its book, as in Once Upon a Time.
   book's theme.
 - Gemini by API key (Vertex AI or Google AI Studio) besides Google Cloud credentials.
 - Tokens shown next to the cost, per book and in total.
+- Convert all pending pages; Wikimedia Commons photos with their credit; photo licenses checked.
+- Extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page.
+- Bilingual books with AI translation; Amazon listing drafted by AI; listing images.
+- KDP costs for the UK and EU stores; 8 × 10 and square trims; CMYK through a press profile.
+- Templates, kawaii and mandala styles, an adult level.
+- Duplicate a book; export and import it as a ZIP; credentials mounted only when used.
 
 ## MVP acceptance criteria
 
@@ -321,3 +326,8 @@ run end to end yet.
   a photo" rule: it is not a coloring page.
 - **2026-10-31, API keys:** Gemini can be reached with an API key (Vertex AI express or Google AI
   Studio), for people without a Google Cloud project.
+- **2026-10-31, activities are generated, not drawn:** word searches, mazes and connect-the-dots
+  come from code and the book's own pages, seeded with the book id: reproducible, free, and the
+  solutions always match. The AI is not asked to draw puzzles.
+- **2026-10-31, AI text only from what is there:** the text model translates captions and
+  describes the book for Amazon; it is not asked for facts about the subjects.

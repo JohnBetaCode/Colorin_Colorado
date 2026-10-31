@@ -11,25 +11,29 @@ update that module, this page and `tests/test_kdp.py` together.
 ## The short version
 
 1. **Rights first.** Only use photos you took yourself or whose license allows commercial use and
-   derivatives ([Rights to the photos](#rights-to-the-photos)). Write each photo's credit in the
-   workbench.
+   derivatives ([Rights to the photos](#rights-to-the-photos)). Set each photo's license and
+   credit in the workbench.
 2. **Finish the book.** Approve every page, check every drawing for AI mistakes, and type the
    captions.
-3. **Export settings** (📄 Export PDF): Letter size, **blank backs on**, and the copyright page text.
-4. **🛒 Amazon KDP view**: pick the ink, set the price, and fix everything marked as an error.
+3. **Export settings** (📄 Export PDF): the size, **blank backs on**, the extra pages you want,
+   and the copyright page text.
+4. **🛒 Amazon KDP view**: pick the ink and the store, set the price, fix everything marked as an
+   error, and draft the product page in **📝 Amazon listing**.
 5. **Build both files**: the interior from 📄 Export PDF and the cover from 🛒 Amazon KDP, with
    the same page count. Give the cover a color image first: uploaded, or drawn by the AI.
-6. **On KDP**: create a paperback, fill in the details, answer **yes** to AI-generated images,
-   upload both PDFs with the settings the KDP view lists, check the online previewer, **order a
-   proof copy**, and publish.
+6. **On KDP**: create a paperback, fill in the details from the listing, answer **yes** to
+   AI-generated images, upload both PDFs with the settings the KDP view lists, check the online
+   previewer, **order a proof copy**, and publish. The listing images help with A+ content and
+   social media.
 
 ## Interior file
 
 | KDP requirement | Value | How the app meets it |
 |---|---|---|
 | Format | PDF | 📄 Export PDF |
-| Trim size | 8.5 × 11 in is the usual size for coloring books. 8.27 × 11.69 in (A4), 8 × 10 in and 8.5 × 8.5 in also exist | Letter = 8.5 × 11 in; A4 = 8.27 × 11.69 in |
-| Page count, 8.5 × 11 in | Black ink: 24–590. Standard color: 72–600. Premium color: 24–590 | The KDP view counts the interior's pages and flags anything out of range |
+| Trim size | 8.5 × 11 in is the usual size for coloring books. 8.27 × 11.69 in (A4), 8 × 10 in and 8.5 × 8.5 in also exist | All four: Letter, A4, 8 × 10 and square |
+| Page count, 8.5 × 11 in and 8.5 × 8.5 in | Black ink: 24–590. Standard color: 72–600. Premium color: 24–590 | The KDP view counts the interior's pages and flags anything out of range |
+| Page count, 8 × 10 in | Black ink: 24–828. Standard color: 72–600. Premium color: 24–828 | Flagged |
 | Page count, A4 | Black ink: 24–780. Standard color: **not offered**. Premium color: 24–590 | Flagged |
 | Bleed | Only needed when ink reaches the edge of the page. Bleed adds 0.125 in to the width and 0.25 in to the height | Nothing reaches the edge: choose **No Bleed** |
 | Outside, top and bottom margins | At least 0.25 in without bleed | 0.5 in |
@@ -46,11 +50,14 @@ What the interior contains, in order:
    author, "All rights reserved", edition, ISBN) and the photo credits (`p. 3 · Toucan: Bernard
    Gagnon, CC0`). It is printed only when there is text or at least one credit; otherwise that page
    is blank (with blank backs) or skipped.
-3. **"This book belongs to"** page, plus a blank back (both optional).
+3. **"This book belongs to"** page, plus a blank back (both optional), and the **color test** page
+   if chosen.
 4. **One coloring page per sheet**, each followed by a blank back.
+5. The chosen **extra pages**: word search, maze, connect-the-dots, solutions, diploma, closing
+   page, each followed by a blank back.
 
-With blank backs and the owner page, the interior has `4 + 2 × drawings` pages: 10 drawings is the
-24-page minimum, and 50 drawings make 104 pages.
+With blank backs and the owner page, the interior has `4 + 2 × (drawings + extra pages)` pages:
+10 drawings is the 24-page minimum (or 7 drawings and 3 extras), and 50 drawings make 104 pages.
 
 ## Cover file
 
@@ -65,7 +72,7 @@ KDP → **Build cover** makes it for the interior the book exports now.
 | Safe area | Text at least 0.125 in inside the trim; nothing from the front or back in the spine | Everything stays 0.375 in inside the trim |
 | Barcode | KDP prints it in a 2 × 1.2 in white box in the lower right of the back cover, about 0.25 in from the spine and the bottom edge | That corner is left empty |
 | Resolution | 300 DPI | Line art is upsampled to at least 300 ppi. A cover image needs about 2600 × 3400 px to fill the front at 300 ppi (Letter); AI images are drawn in 4K (3584 × 4800 px, about 415 ppi), and the KDP view warns about smaller uploads |
-| Color | CMYK, one color space, no spot colors; KDP removes ICC profiles | All CMYK: the background, the text, the line art (black on the K plate only), and the cover image, converted with a plain formula that prints grays and darks with black ink only |
+| Color | CMYK, one color space, no spot colors; KDP removes ICC profiles | All CMYK: the background, the text, the line art (black on the K plate only), and the cover image, converted through a coated-paper press profile (Ghostscript's, with LittleCMS), which keeps the total ink near 300%. No profile is embedded |
 | File size | Under 650 MB; 40 MB or less recommended | A few hundred KB with line art; a few MB with a cover image |
 
 The cover file name carries the page count it was sized for (`<slug>-cover-104p-<time>.pdf` under
@@ -112,16 +119,16 @@ photo is the point. Cream paper is meant for novels and changes how colors look:
 
 ## Costs and royalties
 
-**Printing cost per copy** (Amazon.com, USD). Letter and A4 are "large" trims (wider than 6.12 in
-or taller than 9 in):
+**Printing cost per copy**. Every size the app offers is a "large" trim (wider than 6.12 in or
+taller than 9 in):
 
-| Ink | Pages | Large trim |
-|---|---|---|
-| Black, white paper | 24–108 | $2.84 flat |
-| Black, white paper | 110–828 | $1.00 + $0.017 per page |
-| Standard color | 72–600 | $1.00 + $0.0402 per page |
-| Premium color | 24–40 | $4.20 flat |
-| Premium color | 42–828 | $1.00 + $0.08 per page |
+| Ink | Pages | Amazon.com (USD) | Amazon.co.uk (GBP) | Amazon.es and EU (EUR) |
+|---|---|---|---|---|
+| Black, white paper | 24–108 | $2.84 flat | £2.15 flat | €2.48 flat |
+| Black, white paper | 110–828 | $1.00 + $0.017/page | £0.85 + £0.012/page | €0.75 + €0.016/page |
+| Standard color | 72–600 | $1.00 + $0.0402/page | £0.85 + £0.027/page | €0.75 + €0.035/page |
+| Premium color | 24–40 | $4.20 flat | £3.24 flat | €3.61 flat |
+| Premium color | 42–828 | $1.00 + $0.08/page | £0.85 + £0.0598/page | €0.75 + €0.0715/page |
 
 Since black ink costs the same for any count under 110 pages, **up to 52 drawings** (108 pages with
 blank backs) costs the same to print as 10.
@@ -134,10 +141,12 @@ blank backs) costs the same to print as 10.
 | Amazon.es | ≤ €9.98 | ≥ €9.99 |
 | Amazon.co.uk | ≤ £7.98 | ≥ £7.99 |
 
-The 50% band started on 2025-06-10. **Expanded Distribution** (bookstores, libraries) pays 40% of
-the list price minus printing. The **minimum list price** is printing cost ÷ royalty rate; the
-maximum on Amazon.com is $250. Printing costs in other stores are in their own currency and differ:
-the app only estimates Amazon.com, so use KDP's royalty calculator for the rest.
+The 50% band started on 2025-06-10. In the UK and EU stores **the list price is before VAT**:
+Amazon adds the local VAT on top, and the royalty is computed on the list price. **Expanded
+Distribution** (bookstores, libraries) pays 40% of the list price minus printing. The **minimum
+list price** is printing cost ÷ royalty rate; the maximum on Amazon.com is $250. The KDP view
+estimates all three stores (pick one under **Store**); other stores, like Japan or Australia, are
+not covered.
 
 ## Content rules
 
@@ -187,6 +196,13 @@ of that photo. Before using a photo, check:
 | Stock photos | Only if the license allows derivatives in products for sale. Read it: many standard licenses restrict products whose main value is the image |
 | Found on Google or social media | **No** |
 
+In the app, every page has a **license** (the options above) next to its credit. The KDP view
+**blocks** NC and ND photos, warns about pages with no license or with a CC license and no credit,
+and explains CC BY-SA. A **Wikimedia Commons** link fills the credit and the license by itself
+(🔎 Fill from Wikimedia Commons in the workbench, or 🌐 Add from Commons in 🗂️ Pages); check it
+anyway, since Commons pages are written by people and some licenses (GFDL) are left as "not set"
+for you to decide.
+
 **People.** A recognizable person in a book for sale needs their written consent, and for a child,
 the parents'. **Brands and characters**: leave out logos, mascots and cartoon characters, even in
 the background. **Landmarks**: buildings and monuments in public places are generally fine, but
@@ -222,9 +238,9 @@ What changes depends on your country. The example is Colombia, the case this pag
 | Language | Spanish (or English), matching the book |
 | Title and subtitle | Exactly as on the cover |
 | Author | Your name, as printed on the cover and the copyright page |
-| Description | What the book contains, the age group, and that every page has its real photo |
-| Keywords | Up to 7: "libro para colorear", the subject ("aves", "animales"), the age… |
-| Categories | Up to 3, e.g. Children's Books → Activities → Coloring |
+| Description | What the book contains, the age group, and that every page has its real photo. **📝 Amazon listing → ✨ Suggest with AI** drafts it in simple HTML |
+| Keywords | Up to 7: "libro para colorear", the subject ("aves", "animales"), the age… (drafted there too) |
+| Categories | Up to 3, e.g. Children's Books → Activities → Coloring (suggested there too) |
 | Reading age | The book's age group |
 | ISBN | KDP's free ISBN is fine (the imprint shows "Independently published") |
 | AI-generated content | **Yes → images**, naming the tool (Gemini) |
@@ -235,15 +251,23 @@ What changes depends on your country. The example is Colombia, the case this pag
 | Proof copy | Order one before publishing |
 | Price | At least the minimum the KDP view shows; $9.99 or more for the 60% rate |
 
+## Images for the product page
+
+**🖼️ Images for the listing and social media** in the KDP view builds three images from the
+book's own PDFs, so they show exactly what buyers get: a 3D mockup of the book (2000 × 2000 px), a
+look inside with three coloring pages (2400 × 1600 px) and the front cover alone. Use them for
+Amazon's A+ content (KDP → Marketing), social media or your own shop. The main product image is
+the cover you upload; Amazon makes it from the cover PDF.
+
 ## What the app does not do
 
 - **Bleed** (art to the edge of the page) and crop marks: the drawings sit inside the margins, so
   KDP does not need them.
 - **Hardcover**: KDP's large hardcover is 8.25 × 11 in with at least 75 pages, a different trim from
   the interior. Not supported.
-- **Cost estimates outside Amazon.com.**
-- **Color-managed cover images**: the RGB→CMYK conversion is a plain formula, not a press profile.
-  For exact colors, prepare the image in a design tool and check the proof copy.
+- **Cost estimates for stores other than the US, UK and EU** (Japan, Canada, Australia…).
+- **Proof-matched cover colors**: the press profile is a generic coated one, not KDP's. For exact
+  colors, prepare the image in a design tool and check the proof copy.
 
 ## Sources
 

@@ -18,11 +18,14 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
   export_panel.py   ├──► app/core/imaging.py ──┬──► app/core/gemini.py ──► Gemini (Vertex AI or AI Studio)
   kdp_panel.py      │                          │         └──► app/core/usage.py (data/usage.jsonl)
                     │                          └──► app/core/lineart.py (clean, draft)
+                    ├──► app/core/captions.py  (translations, Amazon listing) ──► gemini.py
                     ├──► app/core/cover_art.py (front cover images) ──► gemini.py
-                    ├──► app/core/export.py    (ReportLab PDF: the interior)
+                    ├──► app/core/commons.py   (Wikimedia Commons photos and credits)
+                    ├──► app/core/export.py    (ReportLab PDF: the interior) ──► extras.py
                     ├──► app/core/kdp.py       (KDP numbers, review) ──► export.py, cover_art.py
                     ├──► app/core/cover.py     (KDP wraparound cover) ──► export.py, kdp.py, cover_art.py
-                    └──► app/core/i18n.py, config.py
+                    ├──► app/core/marketing.py (listing images) ──► export.py, cover.py
+                    └──► app/core/i18n.py, config.py, templates.py
 ```
 
 ## Modules
@@ -33,11 +36,16 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 | `core/gemini.py` | One cached `genai.Client` per location, created under a lock (concurrent first calls used to build throwaway clients that closed their connection when garbage-collected): Vertex AI with ADC and a project, Vertex AI with an API key, or the Gemini Developer API with an AI Studio key. `generate_image` takes reference images (JPEG/PNG/WebP sniffed), aspect ratio and size, returns the final image (not the low-resolution drafts the model thinks with, which come first, marked `thought`), and retries once when no image comes back. Every call records usage. |
 | `core/usage.py` | One JSON line per call with input, output and thinking tokens and the estimated cost (`PRICING`; thinking tokens of image models at the text rate); `book_context(book_id)` attributes calls to a book; `summarize` and `breakdown` feed the usage panel and the sidebar. |
 | `core/schema.py` | Pydantic models `Book`, `Page`, `Version`, `Crop`, `CoverArt` and the option tuples (`STYLES`, `AGE_GROUPS`...). |
-| `core/books.py` | Book folders under `books/`, `book.json`, slugs (accents folded), create/list/delete. |
+| `core/books.py` | Book folders under `books/`, `book.json`, slugs (accents folded), create/list/delete, `duplicate_book`, and `export_zip`/`import_zip` (a book as a ZIP without its exports; imports become new books, and entries outside the book layout are ignored). |
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
-| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo, and `convert_page`, which runs an engine, cleans the result and stores it as a new version. |
+| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three AI calls at a time, stored from the calling thread). |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
-| `core/export.py` | `preflight` (what the PDF will contain, captions that overflow), `sheets` (every interior page in print order) and `export_book_pdf`. |
+| `core/export.py` | `preflight` (what the PDF will contain, captions that overflow, extras the pages cannot make), `sheets` (every interior page in print order) and `export_book_pdf`. |
+| `core/extras.py` | The extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page. Generated, never drawn by the AI, seeded with the book id; `available` says which ones the pages can make. |
+| `core/captions.py` | Text from the text model: `translate` (a caption into the book's second language) and `suggest_listing` (the Amazon description, keywords, categories, reading age). |
+| `core/commons.py` | Wikimedia Commons: `lookup` (author, license, link of a file page, license mapped to the app's), `download`, `add_page`. |
+| `core/templates.py` | Kinds of book: default background and the info labels the workbench inserts. |
+| `core/marketing.py` | Listing images: builds the interior and cover into a temporary folder, renders them with pdfium and composes a 3D mockup, a look inside and the front cover. |
 | `core/kdp.py` | Amazon KDP numbers (trims, page ranges, spine, cover size, printing cost, royalty) and `review`, which measures a book against them. The numbers and their sources are in [amazon-kdp.md](amazon-kdp.md); update both together. |
 | `core/cover_art.py` | Color front-cover images, versioned under `cover_art/`: `add_upload`, `generate` (the AI, from a collage of pages, a description or the book's theme), `select`, and `to_cmyk`. |
 | `core/cover.py` | `export_cover_pdf`: the KDP wraparound cover (back, spine, front) in CMYK. |
@@ -58,6 +66,8 @@ books/<slug>/
   exports/<slug>-<timestamp>.pdf  one file per build, never overwritten
   exports/covers/<slug>-cover-<pages>p-<timestamp>.pdf
                                   KDP cover, sized for an interior of <pages> pages
+  exports/marketing/<slug>-images-<timestamp>.zip
+                                  listing images: mockup, look inside, front cover
 ```
 
 A page's status moves `pending → converted → approved`; a new version or switching versions puts
@@ -76,6 +86,11 @@ id, not slug, because a deleted book's slug can be reused.
    **Draft engine**: mean shift + k-means flatten the photo into a few color areas and their
    borders become the lines, so every area is closed. Free, deterministic, and not a drawing.
 3. `lineart.clean` the result and store raw + clean as the next version, selected.
+
+`convert_pages` runs step 1–2 for many pages in a thread pool (three AI calls at a time; the
+draft engine one at a time) and stores each result from the calling thread as it arrives, so
+`pages.json` is never written by two threads. `usage.book_context` is process-wide, so it is set
+once around the pool.
 
 ### Cleanup (`lineart.clean`)
 
@@ -98,7 +113,7 @@ It reports `CleanResult.warnings` (`was_mockup`, `had_color`, `had_shading`, `fi
 
 ### PDF export (`export.export_book_pdf`)
 
-ReportLab canvas, Letter or A4, Andika (SIL) as the typeface. `sheets` lists the pages in print
+ReportLab canvas, Letter, A4, 8 × 10 in or 8.5 × 8.5 in, Andika (SIL) as the typeface. `sheets` lists the pages in print
 order and both the builder and the KDP page count use it: a title page with the cover page's line
 art; a copyright page on its back (the book's `legal` text and the pages' photo `credit`s, printed
 only when there is one or the other); the optional owner page; then one sheet per included page:
@@ -113,6 +128,28 @@ which keeps curves smooth and pixels pure. Photos are bounded JPEGs. Every font 
 canvas is created with `initialFontName`, because ReportLab otherwise references Helvetica on every
 page, which is never embedded and makes KDP reject the file.
 
+### Extra pages (`extras`)
+
+`export.sheets` asks `extras.available` which of the book's extras the pages can make and puts
+them in a fixed order: the color test after the owner page; word search, maze, connect-the-dots
+and solutions after the coloring pages; then the diploma and the closing page. Puzzles are seeded
+with the book id, so every export draws the same ones and the solutions match.
+
+- **Word search**: the longest word of each page title, uppercased without accents (Ñ kept),
+  on a grid of 8 to 16 cells with the directions the age group allows.
+- **Maze**: a perfect maze carved depth-first, solved by breadth-first search for the solutions.
+- **Connect-the-dots**: the subject's silhouette is what the white background cannot reach from
+  the border; it is smoothed (opening and closing remove thin spikes and notches), the outline is
+  erased from the drawing, and dots are spaced evenly along it, clockwise from the top. Only
+  drawings with no background are used unless the author picks one: in a scene the outline runs
+  through the background.
+
+### Bilingual captions
+
+`Book.languages` is the book's language plus the second one, if any. The caption box prints the
+page's `translation` under its caption (smaller, muted, subtitle once), and fixed labels come from
+`i18n.t_all`. `captions.translate` asks the text model for a `Caption` and never invents content.
+
 ### KDP cover (`cover.export_cover_pdf`)
 
 The page count comes from `export.sheets`, so the cover matches the interior built from the same
@@ -123,6 +160,10 @@ K plate only (a plain RGB→CMYK conversion would print black as four inks). Wit
 front is that image cropped to fill the front and its bleed, converted with `cover_art.to_cmyk`
 (full black generation, no press profile) and embedded as a CMYK JPEG, under rounded labels for the
 title and the dedication. Spine text only from 79 pages and when it fits at 5 pt or more.
+
+`cover_art.to_cmyk` converts through Ghostscript's CMYK press profile (`libgs-common` in the
+image) with LittleCMS, perceptual intent, which keeps colors closer and the total ink near 300%;
+`plain_cmyk` is the fallback when the profile is missing.
 
 ### Cover art (`cover_art.generate`)
 
@@ -158,4 +199,7 @@ page.
 | No print-on-demand in v1 | Amazon KDP files and checks | Selling the books on Amazon became a goal; see [amazon-kdp.md](amazon-kdp.md). |
 | Never draw from text | Cover art may be drawn from text | The front cover is a color illustration, not a coloring page. |
 | Vertex AI with ADC only | ADC or an API key | Not everyone has a Google Cloud project. |
+| Convert all pending in phase 2 | Done, with three AI calls at a time | Converting a 50-page book one by one took too long. |
+| More styles and templates in phase 3 | Kawaii, mandala, an adult level, and four kinds of book | Asked for after the MVP. |
+| AI caption suggestions in phase 2 | Translations and the Amazon listing only | Suggesting facts risks inventing them; translating and describing what is there does not. |
 | Thicken lines to the age group's width | Thicken step by step, stop before areas merge | Growing dense drawings to the 3–5 width turned them into black blobs. |
