@@ -30,7 +30,8 @@ name a country or city (the author's own books can be about anything).
 - Per-age settings live in several dicts (`lineart`, `imaging.AGE_PROMPTS`, `extras`, `mosaic`); a new age
   group or style needs an entry in each, and a check on real photos recorded in `docs/spike.md`.
 - Versions are append-only (`pages.add_version`, `cover_art`); never overwrite `v<n>.png` or
-  `cover_art/v<n>.jpg`.
+  `cover_art/v<n>.jpg`. A page version is deleted only when the author asks
+  (`pages.delete_version`), and its number is never reused (`Page.last_version`).
 - Streamlit widgets fed from saved data: seed the key with `ui.common.seed` and do not pass
   `value=`/`index=`; keep option labels free of data that changes while the user works. See
   "UI rules" in `docs/architecture.md` for why (lost clicks).

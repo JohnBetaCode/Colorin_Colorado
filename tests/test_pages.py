@@ -44,6 +44,33 @@ def test_versions_are_numbered_selected_and_never_overwritten(photo, line_art):
     assert pages.approve(book.slug, page.id).status == "approved"
 
 
+def test_deleting_a_version_removes_its_files_and_never_reuses_its_number(photo, line_art):
+    book = books.create_book("Test")
+    page = pages.add_photo(book.slug, "a.png", photo)
+    clean = lineart.clean(line_art, "6-8").image
+    for _ in range(3):
+        pages.add_version(book.slug, page.id, _version(), line_art, clean)
+    pages.approve(book.slug, page.id)
+
+    page = pages.delete_version(book.slug, page.id, 2)  # not the selected one: nothing else changes
+    assert [v.n for v in page.versions] == [1, 3]
+    assert (page.selected, page.status) == (3, "approved")
+    assert not pages.version_path(book.slug, page.id, 2).exists()
+    assert not pages.version_path(book.slug, page.id, 2, raw=True).exists()
+
+    page = pages.delete_version(book.slug, page.id, 3)  # the selected, approved one
+    assert (page.selected, page.status) == (1, "converted")
+    page = pages.add_version(book.slug, page.id, _version(), line_art, clean)
+    assert [v.n for v in page.versions] == [1, 4]  # 3 was deleted, not free
+
+    pages.delete_version(book.slug, page.id, 1)
+    page = pages.delete_version(book.slug, page.id, 4)
+    assert (page.versions, page.selected, page.status) == ([], None, "pending")
+    assert pages.selected_path(book.slug, page) is None
+    with pytest.raises(ValueError):
+        pages.delete_version(book.slug, page.id, 4)
+
+
 def test_approve_requires_a_coloring_page(photo):
     book = books.create_book("Test")
     page = pages.add_photo(book.slug, "a.png", photo)

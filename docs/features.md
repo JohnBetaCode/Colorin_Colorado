@@ -11,7 +11,8 @@ part.
   weight and detail follow the age group; templates for nature, landmarks and family albums
   suggest what each page says.
 - **Convert the whole book at once**, or page by page in the workbench.
-- **Versions, never lost.** Every conversion is kept; pick the one you like.
+- **Versions, never lost.** Every conversion is kept; pick the one you like, and delete the ones
+  you don't want (after a confirmation).
 - **A free draft mode** to lay out a book before spending anything.
 - **Mystery mosaics** (monochrome color-by-number), free and offline: the photo becomes a faint
   grid with a number, letter, sign or shape in each cell; filled in as the legend says (pencil

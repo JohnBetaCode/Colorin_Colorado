@@ -1,7 +1,8 @@
 """Pages of a book: uploaded photos, their coloring-page versions, order and status.
 
 ``pages.json`` is rewritten whole on every change; the app is single-user and the
-file stays small. Versions are never overwritten: regenerating adds ``v<n+1>``.
+file stays small. Versions are never overwritten: regenerating adds ``v<n+1>``. The
+author may delete one; its number is not reused.
 """
 
 from __future__ import annotations
@@ -125,7 +126,8 @@ def add_version(slug: str, page_id: str, version: Version, raw: bytes, clean: Im
     """Store a new conversion, select it and mark the page as converted."""
     pages = load_pages(slug)
     page = next(p for p in pages if p.id == page_id)
-    version.n = max((v.n for v in page.versions), default=0) + 1
+    version.n = max([page.last_version, *(v.n for v in page.versions)]) + 1
+    page.last_version = version.n
     folder = book_path(slug) / "lineart" / page_id
     folder.mkdir(parents=True, exist_ok=True)
     version_path(slug, page_id, version.n, raw=True).write_bytes(raw)
@@ -133,6 +135,27 @@ def add_version(slug: str, page_id: str, version: Version, raw: bytes, clean: Im
     page.versions.append(version)
     page.selected = version.n
     page.status = "converted"
+    save_pages(slug, pages)
+    return page
+
+
+def delete_version(slug: str, page_id: str, n: int) -> Page:
+    """Delete one version and its files, when the author asks.
+
+    Its number is never given again. When it was the selected one, the newest remaining
+    version is selected and the page needs approving again; with none left it is pending.
+    """
+    pages = load_pages(slug)
+    page = next(p for p in pages if p.id == page_id)
+    if not any(v.n == n for v in page.versions):
+        raise ValueError(f"Page {page_id} has no version {n}.")
+    page.last_version = max([page.last_version, *(v.n for v in page.versions)])
+    page.versions = [v for v in page.versions if v.n != n]
+    for raw in (False, True):
+        version_path(slug, page_id, n, raw=raw).unlink(missing_ok=True)
+    if page.selected == n:
+        page.selected = max((v.n for v in page.versions), default=None)
+        page.status = "converted" if page.versions else "pending"
     save_pages(slug, pages)
     return page
 

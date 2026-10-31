@@ -317,6 +317,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.approve": {"es": "✅ Aprobar", "en": "✅ Approve"},
     "wb.approve_next": {"es": "✅ Aprobar y siguiente", "en": "✅ Approve and next"},
     "wb.approved": {"es": "Página aprobada.", "en": "Page approved."},
+    "wb.delete_version": {"es": "🗑️ Borrar esta versión (v{n})", "en": "🗑️ Delete this version (v{n})"},
+    "wb.delete_version_confirm": {
+        "es": "¿Borrar la versión v{n}? No se puede deshacer. Si la página estaba aprobada, habrá que aprobarla de nuevo.",
+        "en": "Delete version v{n}? This cannot be undone. If the page was approved, it will need approving again.",
+    },
+    "wb.delete_version_yes": {"es": "Sí, borrarla", "en": "Yes, delete it"},
+    "wb.version_deleted": {"es": "Versión v{n} borrada.", "en": "Version v{n} deleted."},
     "wb.caption": {"es": "Texto de la página", "en": "Page text"},
     "wb.caption_help": {
         "es": "Sale en el recuadro de abajo, junto a la foto de referencia. En la información, una línea como «Hábitat: bosques húmedos» pone la etiqueta en negrita.",

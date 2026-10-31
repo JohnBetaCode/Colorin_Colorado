@@ -186,6 +186,7 @@ class Page(BaseModel):
     crop: Crop = Field(default_factory=Crop)
     mosaic: MosaicSettings | None = None  # None: the book's
     versions: list[Version] = Field(default_factory=list)
+    last_version: int = 0  # highest Version.n ever given: a deleted version's number is never reused
     selected: int | None = None  # Version.n shown and exported
     status: Status = "pending"
     in_book: bool = True

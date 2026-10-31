@@ -145,6 +145,43 @@ def _select_version(slug: str, page_id: str) -> None:
     pages.select_version(slug, page_id, st.session_state[f"version_{page_id}"])
 
 
+def _ask_delete_version(page_id: str, n: int) -> None:
+    st.session_state.pending_version_delete = (page_id, n)
+
+
+def _cancel_delete_version() -> None:
+    st.session_state.pending_version_delete = None
+
+
+def _delete_version(slug: str, page_id: str, n: int) -> None:
+    pages.delete_version(slug, page_id, n)
+    st.session_state.pending_version_delete = None
+    st.session_state.pop(f"version_{page_id}", None)  # re-seeded from the new selection
+    flash("success", t("wb.version_deleted", n=n))
+
+
+def _render_delete_version(book: Book, page: Page) -> None:
+    """Delete the version on screen, after a confirmation."""
+    if page.selected is None:
+        return
+    n = page.selected
+    if st.session_state.get("pending_version_delete") != (page.id, n):
+        st.button(
+            t("wb.delete_version", n=n), key=f"delete_version_{page.id}",
+            on_click=_ask_delete_version, args=(page.id, n),
+        )
+        return
+    st.warning(t("wb.delete_version_confirm", n=n))
+    col_yes, col_no = st.columns(2)
+    col_yes.button(
+        t("wb.delete_version_yes"), type="primary", width="stretch", key=f"delete_version_yes_{page.id}",
+        on_click=_delete_version, args=(book.slug, page.id, n),
+    )
+    col_no.button(
+        t("home.cancel"), width="stretch", key=f"delete_version_no_{page.id}", on_click=_cancel_delete_version
+    )
+
+
 def _approve(slug: str, page_id: str, next_id: str | None) -> None:
     pages.approve(slug, page_id)
     flash("success", t("wb.approved"))
@@ -353,6 +390,7 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
             on_change=_select_version,
             args=(book.slug, page.id),
         )
+    _render_delete_version(book, page)
 
     col1, col2 = st.columns(2)
     seed(f"style_{page.id}", page.style or BOOK_DEFAULT)

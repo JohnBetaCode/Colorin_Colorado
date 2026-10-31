@@ -73,7 +73,10 @@ books/<slug>/
 ```
 
 A page's status moves `pending → converted → approved`; a new version or switching versions puts
-it back to `converted`. Versions are numbered and never overwritten, and neither are cover images
+it back to `converted`. The author can delete a version from the workbench, after a confirmation
+(`pages.delete_version`): its files go, its number is never given again (`Page.last_version`), and
+when it was the selected one the newest remaining version is selected (`converted`), or the page
+goes back to `pending` when none is left. Versions are numbered and never overwritten, and neither are cover images
 (`Book.cover_art`, with `cover_art_selected` naming the one the front uses, or `None` for line art). Usage is attributed by book
 id, not slug, because a deleted book's slug can be reused.
 
