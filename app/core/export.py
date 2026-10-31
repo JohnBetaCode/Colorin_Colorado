@@ -427,8 +427,11 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
     return order
 
 
-def export_book_pdf(book: Book) -> Path:
-    """Build the PDF and return its path. Pages without a coloring page are skipped."""
+def export_book_pdf(book: Book, path: Path | None = None) -> Path:
+    """Build the PDF and return its path. Pages without a coloring page are skipped.
+
+    Without ``path`` it is a new file under ``exports/``.
+    """
     included = preflight(book).included
     if not included:
         raise ValueError("No coloring pages to export yet.")
@@ -436,10 +439,11 @@ def export_book_pdf(book: Book) -> Path:
     fonts = load_fonts()
     cover = next((p for p in included if p.id == book.cover_page_id), included[0])
 
-    folder = exports_dir(book)
-    folder.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    path = folder / f"{book.slug}-{stamp}.pdf"
+    if path is None:
+        folder = exports_dir(book)
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        path = folder / f"{book.slug}-{stamp}.pdf"
 
     # ReportLab sets the initial font on every page; the default (Helvetica) is never embedded.
     c = Canvas(str(path), pagesize=(layout.width, layout.height), initialFontName=fonts.regular)

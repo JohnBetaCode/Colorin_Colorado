@@ -206,8 +206,11 @@ def _draw_spine(c: Canvas, book: Book, spine: Box, fonts: Fonts) -> None:
     c.restoreState()
 
 
-def export_cover_pdf(book: Book) -> Path:
-    """Build the wraparound cover for the interior the book exports now; returns its path."""
+def export_cover_pdf(book: Book, path: Path | None = None) -> Path:
+    """Build the wraparound cover for the interior the book exports now; returns its path.
+
+    Without ``path`` it is a new file under ``exports/covers/``.
+    """
     included = export.preflight(book).included
     if not included:
         raise ValueError("No coloring pages to put on the cover yet.")
@@ -219,10 +222,11 @@ def export_cover_pdf(book: Book) -> Path:
     fonts = export.load_fonts()
     front_page = next((p for p in included if p.id == book.cover_page_id), included[0])
 
-    folder = covers_dir(book)
-    folder.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    path = folder / f"{book.slug}-cover-{count}p-{stamp}.pdf"
+    if path is None:
+        folder = covers_dir(book)
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        path = folder / f"{book.slug}-cover-{count}p-{stamp}.pdf"
 
     c = Canvas(str(path), pagesize=(width, height), initialFontName=fonts.regular)
     c.setTitle(book.title)

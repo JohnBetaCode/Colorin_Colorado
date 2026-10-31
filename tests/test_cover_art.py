@@ -113,3 +113,17 @@ def test_review_flags_small_or_ai_cover_images(photo, line_art, monkeypatch):
     book = cover_art.generate(book, "theme")
     issues = {i.key for i in kdp.review(book).issues}
     assert "ai_disclosure" in issues and "cover_art_low_res" not in issues
+
+
+def test_listing_images_are_made_from_the_books_pdfs(photo, line_art):
+    import zipfile
+
+    from app.core import export, marketing
+
+    book = _book(photo, line_art, n_pages=4)
+    path = marketing.export_listing_images(book, export.preflight(book).included)
+    with zipfile.ZipFile(path) as archive:
+        sizes = {name: Image.open(BytesIO(archive.read(name))).size for name in archive.namelist()}
+    assert sizes["mockup.jpg"] == (2000, 2000) and sizes["inside.jpg"] == (2400, 1600)
+    assert sizes["front.jpg"][1] == marketing.FRONT_HEIGHT
+    assert not list(export.exports_dir(book).glob("*.pdf"))  # the PDFs were temporary

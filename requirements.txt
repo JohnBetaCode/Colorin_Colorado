@@ -8,6 +8,7 @@ pillow==11.3.0
 pillow-heif==1.1.1            # HEIC/HEIF uploads (iPhone photos)
 opencv-python-headless==4.12.0.88
 numpy==2.2.6                  # opencv-python-headless 4.12 needs numpy<2.3
+pypdfium2==4.30.0             # renders the PDFs into the listing images
 
 # Tests
 pytest==8.4.2

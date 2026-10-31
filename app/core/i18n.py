@@ -528,6 +528,15 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "kdp.listing_categories": {"es": "Categorías sugeridas, una por línea", "en": "Suggested categories, one per line"},
     "kdp.listing_reading_age": {"es": "Edad de lectura", "en": "Reading age"},
+    "kdp.images": {"es": "🖼️ Imágenes para la ficha y redes", "en": "🖼️ Images for the listing and social media"},
+    "kdp.images_help": {
+        "es": "Un libro en 3D, tres páginas por dentro y la portada sola, hechos con los PDF del libro tal como están (sin IA). Sirven para el contenido A+ de Amazon, redes sociales o una tienda.",
+        "en": "A 3D book, three pages from inside and the front cover alone, made from the book's PDFs as they are (no AI). For Amazon A+ content, social media or a shop.",
+    },
+    "kdp.images_build": {"es": "Generar imágenes", "en": "Build images"},
+    "kdp.images_building": {"es": "Generando las imágenes…", "en": "Building the images…"},
+    "kdp.images_failed": {"es": "No se pudieron generar: {error}", "en": "Could not build them: {error}"},
+    "kdp.images_download": {"es": "⬇️ Descargar las imágenes (ZIP)", "en": "⬇️ Download the images (ZIP)"},
     "kdp.cover": {"es": "Portada para KDP", "en": "KDP cover"},
     "kdp.cover_help": {
         "es": "Un solo PDF con contraportada, lomo y portada, a la medida del interior actual: {width:.3f} × {height:.3f} in con lomo de {spine:.3f} in. El título va en el lomo cuando es lo bastante ancho (unas 96 páginas). La esquina inferior derecha de la contraportada queda libre para el código de barras que pone KDP.",

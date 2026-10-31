@@ -3,12 +3,13 @@ uploading, the upload settings, and the wraparound cover with its front image.""
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image
 
-from app.core import books, captions, cover, cover_art, export, gemini, kdp, pages
+from app.core import books, captions, cover, cover_art, export, gemini, kdp, marketing, pages
 from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import ART_MODES, COVER_COLORS, INKS, MARKETPLACES, Book, Listing, Page
@@ -100,6 +101,27 @@ def _render_listing(book: Book) -> None:
     too_long = [k for k in book.listing.keywords if len(k) > captions.MAX_KEYWORD_CHARS]
     if len(book.listing.keywords) > captions.MAX_KEYWORDS or too_long:
         st.warning(t("kdp.listing_keywords_warning", max=captions.MAX_KEYWORDS, chars=captions.MAX_KEYWORD_CHARS))
+
+
+def _render_listing_images(book: Book, included: list[Page]) -> None:
+    st.markdown(f"#### {t('kdp.images')}")
+    st.caption(t("kdp.images_help"))
+    if st.button(t("kdp.images_build")):
+        with st.spinner(t("kdp.images_building")):
+            try:
+                marketing.export_listing_images(book, included)
+            except Exception as exc:
+                st.error(t("kdp.images_failed", error=exc))
+    archives = sorted(marketing.marketing_dir(book).glob("*.zip"), key=lambda f: f.stat().st_mtime)
+    if not archives:
+        return
+    latest = archives[-1]
+    with zipfile.ZipFile(latest) as archive:
+        names = sorted(archive.namelist(), key=["mockup.jpg", "inside.jpg", "front.jpg"].index)
+        columns = st.columns([2, 3, 1.4])
+        for column, name in zip(columns, names):
+            column.image(archive.read(name), caption=name, width="stretch")
+    st.download_button(t("kdp.images_download"), data=latest.read_bytes(), file_name=latest.name, mime="application/zip")
 
 
 def _latest_cover(book: Book) -> Path | None:
@@ -314,3 +336,5 @@ def render(book: Book) -> None:
         return
     st.divider()
     _render_cover(book, review)
+    st.divider()
+    _render_listing_images(book, export.preflight(book).included)
