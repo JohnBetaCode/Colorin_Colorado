@@ -116,8 +116,12 @@ selected mosaic version (`convert_page(..., replace=n)`: store, then delete `n`,
 replacement takes the next number).
 
 In the PDF a mosaic page has no title, caption or photo: "Mystery N", the instructions, the grid
-and a symbol per cell or triangle in light gray vectors, and a legend (symbol → pencil gray or pen
-pattern: solid, crosshatch, lines, dots, white). `export.sheets` adds `mosaic_solutions:<i>`
+and a number per cell or triangle in light gray vectors (none on white cells unless
+`number_white`, so the finished picture has no stray digits), and a legend (number → pencil gray,
+or a pattern from one of `mosaic.PALETTES`: four patterns from darkest to lightest, always
+starting with solid, of which `patterns` picks as many as the tones need, then white). Patterns are
+stroked over the whole grid, clipped to the shapes of their tone; dots, dashes and checkers are
+dashed lines, whose dash restarts on each row, so shifting a row staggers them. `export.sheets` adds `mosaic_solutions:<i>`
 sheets (six per page, filled in, with number and title) after the activities, before the diploma
 and closing page. Mosaics are left out of the word search and the connect-the-dots.
 

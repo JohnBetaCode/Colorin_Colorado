@@ -3,7 +3,7 @@ from PIL import Image
 from pypdf import PdfReader
 
 from app.core import books, export, extras, imaging, mosaic, pages
-from app.core.schema import MosaicSettings
+from app.core.schema import MOSAIC_FILLS, MosaicSettings
 
 
 def _half_black(size=(400, 300)) -> Image.Image:
@@ -51,10 +51,30 @@ def test_grid_survives_the_png_round_trip(tmp_path):
     assert (mosaic.load_grid(path) == grid).all()
 
 
-def test_solution_is_one_bit_for_both_fills():
-    grid = mosaic.make_grid(_half_black(), MosaicSettings(columns=10, tones=4))
-    for fill in ("tones", "patterns"):
-        assert mosaic.render_solution(grid, MosaicSettings(columns=10, tones=4, fill=fill)).mode == "1"
+def test_solution_is_one_bit_for_every_fill():
+    grid = mosaic.make_grid(_upper_left_black(), MosaicSettings(columns=10, tones=5, cells="diagonal"))
+    for fill in MOSAIC_FILLS:
+        assert mosaic.render_solution(grid, MosaicSettings(columns=10, tones=5, fill=fill)).mode == "1"
+
+
+def test_every_palette_has_a_pattern_per_tone_ending_in_white():
+    for fill in MOSAIC_FILLS[1:]:
+        for tones in range(mosaic.MIN_TONES, mosaic.MAX_TONES + 1):
+            chosen = mosaic.patterns(MosaicSettings(fill=fill, tones=tones))
+            assert len(chosen) == tones and chosen[0] == "solid" and chosen[-1] == "empty"
+            assert len(set(chosen)) == tones
+
+
+def test_white_cells_have_no_number_unless_asked():
+    grid = mosaic.make_grid(_half_black(), MosaicSettings(columns=20, tones=2))
+    plain = mosaic.numbered(grid, MosaicSettings(tones=2))
+    assert len(plain) == 15 * 10 and {number for number, _ in plain} == {"1"}  # only the black half
+    assert len(mosaic.numbered(grid, MosaicSettings(tones=2, number_white=True))) == 15 * 20
+
+
+def test_settings_saved_by_the_first_version_still_load():
+    old = MosaicSettings.model_validate({"symbols": "shapes", "fill": "patterns", "tones": 4})
+    assert old.fill == "classic" and not old.number_white
 
 
 def _mosaic_book(photo):
@@ -62,7 +82,7 @@ def _mosaic_book(photo):
     first = pages.add_photo(book.slug, "uno.png", photo)
     pages.update_page(book.slug, first.id, title="Tucán pico iris")
     second = pages.add_photo(book.slug, "dos.png", photo)
-    pages.update_page(book.slug, second.id, mosaic=MosaicSettings(cells="diagonal", fill="patterns", symbols="shapes"))
+    pages.update_page(book.slug, second.id, mosaic=MosaicSettings(cells="diagonal", fill="geometric"))
     book = books.load_book(book.slug)
     imaging.convert_pages(book, pages.load_pages(book.slug), "mosaic")
     return book

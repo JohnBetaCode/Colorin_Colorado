@@ -3,12 +3,14 @@
 The photo is turned to gray and divided into a grid of square cells, or of cells that may be
 split along a diagonal into two triangles where that follows an edge better. Every cell (or
 triangle) gets one of 2 to 5 tones, from black to white. The printed page shows the grid and a
-symbol in every cell, both faint, and a legend that says how to fill each symbol: a pencil tone
-or a pen pattern. Filled in, the photo appears. Nothing is drawn by the AI.
+number in every cell that is not white, both faint, and a legend that says how to fill each
+number: a pencil tone, or a pattern from one of the ``PALETTES``. White cells have no number
+unless the author asks (``number_white``), so the finished picture has no stray digits. Filled in,
+the photo appears. Nothing is drawn by the AI.
 
 A mosaic is stored as data, not as a picture: ``v<n>-raw.png`` is the grid, one pixel per cell
 (red: the tone of the cell or of its first triangle, green: the tone of the second triangle,
-blue: the split). The PDF draws it as vectors, so the faint lines and symbols print sharp at any
+blue: the split). The PDF draws it as vectors, so the faint lines and numbers print sharp at any
 size. ``v<n>.png`` is the solution in 1 bit, for the workbench, the thumbnails and the cover; it
 does not go through ``lineart.clean``, which would hollow out the black cells.
 """
@@ -39,7 +41,7 @@ Point = tuple[float, float]
 
 MIN_TONES, MAX_TONES = 2, 5
 MIN_COLUMNS = 8
-# Symbols inside triangles are smaller, so diagonal cells need a coarser grid to stay legible.
+# Numbers inside triangles are smaller, so diagonal cells need a coarser grid to stay legible.
 MAX_COLUMNS = {"square": 60, "diagonal": 40}
 LIMIT = 50  # contrast and brightness, in percent either way
 
@@ -58,31 +60,38 @@ EQUALIZE = 0.6  # share of histogram equalization in the tone mapping (see _adju
 SPLIT_GAIN = 0.6
 WHOLE, SLASH, BACKSLASH = 0, 1, 2  # blue channel of the grid: no split, "/" or "\"
 
-SYMBOLS = {"numbers": "12345", "letters": "ABCDE", "signs": "!?#&%"}
-SHAPES = ("circle", "triangle", "square", "diamond", "plus")  # drawn, not typed
-# What each tone is called (pencil) or how it is filled (pen), from black to white.
+# What each tone is called with pencil tones, from black to white.
 TONE_NAMES = {
     2: ("black", "white"),
     3: ("black", "mid", "white"),
     4: ("black", "dark", "light", "white"),
     5: ("black", "dark", "mid", "light", "white"),
 }
-PATTERNS = {
-    2: ("solid", "empty"),
-    3: ("solid", "lines", "empty"),
-    4: ("solid", "cross", "lines", "empty"),
-    5: ("solid", "cross", "lines", "dots", "empty"),
+# Pen palettes: four patterns from darkest to lightest; white ("empty") is always the last tone.
+PALETTES = {
+    "classic": ("solid", "cross", "diag", "dots"),
+    "lines": ("solid", "grid", "diag", "hlines"),
+    "stipple": ("solid", "dots_dense", "dots", "dots_sparse"),
+    "geometric": ("solid", "checker", "zigzag", "dashes"),
 }
+# Which of a palette's four patterns are used with fewer tones: always the darkest, spread out.
+_PICK = {1: (0,), 2: (0, 2), 3: (0, 1, 3), 4: (0, 1, 2, 3)}
 
 # The puzzle is printed faint, so the filled-in tones cover it.
 FAINT_LINE = 0.72
-FAINT_SYMBOL = 0.6
+FAINT_NUMBER = 0.6
 INK = colors.HexColor("#1f2933")
 MUTED = colors.HexColor("#5b6470")
 SOLUTION_PX = 2400  # long side of the stored solution, like a cleaned coloring page
 
 
 # --- Settings ---------------------------------------------------------------------
+
+
+def patterns(settings: MosaicSettings) -> tuple[str, ...]:
+    """The pen pattern of each tone, from black to white (the last is always "empty")."""
+    palette = PALETTES[settings.fill]
+    return tuple(palette[i] for i in _PICK[settings.tones - 1]) + ("empty",)
 
 
 def default_settings(age_group: str) -> MosaicSettings:
@@ -242,45 +251,81 @@ def _path(c: Canvas, polygons: list[list[Point]], place: _Place):
     return path
 
 
+def _draw_pattern(c: Canvas, name: str, bounds: Box, cell: float) -> None:
+    """Stroke pattern ``name`` in black over ``bounds``; the caller clips it to the shapes.
+
+    Rows are separate subpaths, and a dash pattern restarts at each one, so shifting a row's
+    start staggers its dots, dashes or checker squares.
+    """
+    x, y, w, h = bounds
+    gap = max(cell / 3.5, 1.5)  # about three and a half pattern steps per cell
+    lines = c.beginPath()
+
+    def diagonals(rising: bool) -> None:
+        step = gap * math.sqrt(2)  # perpendicular distance ``gap`` between 45° lines
+        for offset in np.arange(-h, w + step, step):
+            lines.moveTo(x + offset, y if rising else y + h)
+            lines.lineTo(x + offset + h, y + h if rising else y)
+
+    def rows(step: float, shift: float = 0.0) -> None:
+        for row, yy in enumerate(np.arange(y + step / 2, y + h + step, step)):
+            lines.moveTo(x - 2 * step + (shift if row % 2 else 0), yy)
+            lines.lineTo(x + w + 2 * step, yy)
+
+    c.setStrokeGray(0)
+    c.setLineWidth(max(cell * 0.07, 0.35))
+    if name == "cross":
+        diagonals(True)
+        diagonals(False)
+    elif name == "diag":
+        diagonals(True)
+    elif name == "grid":
+        rows(gap)
+        for xx in np.arange(x + gap / 2, x + w, gap):
+            lines.moveTo(xx, y - gap)
+            lines.lineTo(xx, y + h + gap)
+    elif name == "hlines":
+        rows(gap * 1.5)
+    elif name in ("dots_dense", "dots", "dots_sparse"):
+        step, size = {"dots_dense": (0.75, 0.17), "dots": (1.0, 0.14), "dots_sparse": (1.6, 0.13)}[name]
+        step *= gap
+        c.setLineCap(1)
+        c.setLineWidth(max(cell * size, 0.6))
+        c.setDash([0, step])
+        rows(step, shift=step / 2)
+    elif name == "checker":
+        c.setLineWidth(gap)
+        c.setDash([gap, gap])
+        rows(gap, shift=gap)
+    elif name == "zigzag":
+        for yy in np.arange(y, y + h + gap, gap * 1.3):
+            lines.moveTo(x - gap, yy)
+            for k, xx in enumerate(np.arange(x - gap, x + w + gap, gap / 2)):
+                lines.lineTo(xx, yy + (gap * 0.45 if k % 2 else 0))
+    elif name == "dashes":
+        c.setDash([gap * 0.6, gap * 0.6])
+        rows(gap * 1.2, shift=gap * 0.6)
+    c.drawPath(lines, stroke=1, fill=0)
+
+
 def _fill(c: Canvas, settings: MosaicSettings, tone: int, path, bounds: Box, cell: float) -> None:
     """Fill ``path`` the way the legend says for ``tone``: a gray, or a pattern in black ink."""
-    tones = settings.tones
     if settings.fill == "tones":
-        gray = tone / (tones - 1)
+        gray = tone / (settings.tones - 1)
         if gray < 1:
             c.setFillGray(gray)
             c.drawPath(path, stroke=0, fill=1)
         return
-    pattern = PATTERNS[tones][tone]
-    if pattern == "empty":
+    name = patterns(settings)[tone]
+    if name == "empty":
         return
-    if pattern == "solid":
+    if name == "solid":
         c.setFillGray(0)
         c.drawPath(path, stroke=0, fill=1)
         return
-    x, y, w, h = bounds
-    gap = max(cell / 3.5, 1.5)
     c.saveState()
     c.clipPath(path, stroke=0, fill=0)
-    c.setStrokeGray(0)
-    lines = c.beginPath()
-    if pattern == "dots":
-        c.setLineCap(1)
-        c.setLineWidth(max(cell * 0.14, 0.6))
-        c.setDash([0, gap])
-        for row, yy in enumerate(np.arange(y + gap / 2, y + h, gap)):
-            lines.moveTo(x - gap + (gap / 2 if row % 2 else 0), yy)
-            lines.lineTo(x + w + gap, yy)
-    else:
-        c.setLineWidth(max(cell * 0.07, 0.35))
-        step = gap * math.sqrt(2)  # perpendicular distance ``gap`` between 45° lines
-        for offset in np.arange(-h, w + step, step):
-            lines.moveTo(x + offset, y)
-            lines.lineTo(x + offset + h, y + h)
-            if pattern == "cross":
-                lines.moveTo(x + offset, y + h)
-                lines.lineTo(x + offset + h, y)
-    c.drawPath(lines, stroke=1, fill=0)
+    _draw_pattern(c, name, bounds, cell)
     c.restoreState()
 
 
@@ -297,42 +342,15 @@ def draw_solution(c: Canvas, grid: np.ndarray, settings: MosaicSettings, box: Bo
     c.rect(*place.bounds)
 
 
-def _shape(c: Canvas, name: str, cx: float, cy: float, r: float) -> None:
-    """One of ``SHAPES``, outlined, centered on (cx, cy) with radius ``r``."""
-    if name == "circle":
-        c.circle(cx, cy, r * 0.85, stroke=1, fill=0)
-        return
-    path = c.beginPath()
-    if name == "plus":
-        path.moveTo(cx - r, cy)
-        path.lineTo(cx + r, cy)
-        path.moveTo(cx, cy - r)
-        path.lineTo(cx, cy + r)
-    else:
-        corners = {
-            "triangle": [(0, 1), (0.87, -0.5), (-0.87, -0.5)],
-            "square": [(-0.75, 0.75), (0.75, 0.75), (0.75, -0.75), (-0.75, -0.75)],
-            "diamond": [(0, 1), (1, 0), (0, -1), (-1, 0)],
-        }[name]
-        path.moveTo(cx + corners[0][0] * r, cy + corners[0][1] * r)
-        for dx, dy in corners[1:]:
-            path.lineTo(cx + dx * r, cy + dy * r)
-        path.close()
-    c.drawPath(path, stroke=1, fill=0)
-
-
-def _symbol(c: Canvas, settings: MosaicSettings, tone: int, cx: float, cy: float, size: float, font: str) -> None:
-    """The tone's symbol centered on (cx, cy), ``size`` points tall, in the current colors."""
-    if settings.symbols == "shapes":
-        c.setLineWidth(max(size * 0.08, 0.3))
-        _shape(c, SHAPES[tone], cx, cy, size * 0.42)
-    else:
-        c.setFont(font, size)
-        c.drawCentredString(cx, cy - size * 0.35, SYMBOLS[settings.symbols][tone])
+def numbered(grid: np.ndarray, settings: MosaicSettings) -> list[tuple[str, list[Point]]]:
+    """The number printed in each cell or triangle: its tone counted from 1 (black). White
+    ones have none unless ``number_white``, so the finished picture has no stray digits."""
+    white = None if settings.number_white else settings.tones - 1
+    return [(str(tone + 1), polygon) for tone, polygon in shapes(grid) if tone != white]
 
 
 def draw_puzzle(c: Canvas, grid: np.ndarray, settings: MosaicSettings, box: Box, font: str) -> None:
-    """The faint grid with a faint symbol in every cell or triangle, fitted in ``box``."""
+    """The faint grid with a faint number in every cell or triangle that is not white."""
     place = _Place(grid, box)
     s, rows, cols = place.size, place.rows, place.cols
     c.saveState()
@@ -353,13 +371,14 @@ def draw_puzzle(c: Canvas, grid: np.ndarray, settings: MosaicSettings, box: Box,
         lines.lineTo(*place.point(col + 1, r + 1))
     c.drawPath(lines, stroke=1, fill=0)
 
-    c.setFillGray(FAINT_SYMBOL)
-    c.setStrokeGray(FAINT_SYMBOL)
-    for tone, polygon in shapes(grid):
+    c.setFillGray(FAINT_NUMBER)
+    for number, polygon in numbered(grid, settings):
         u = sum(p[0] for p in polygon) / len(polygon)
         v = sum(p[1] for p in polygon) / len(polygon)
         size = s * (0.5 if len(polygon) == 4 else 0.3)
-        _symbol(c, settings, tone, *place.point(u, v), size, font)
+        cx, cy = place.point(u, v)
+        c.setFont(font, size)
+        c.drawCentredString(cx, cy - size * 0.35, number)
     c.restoreState()
 
 
@@ -368,12 +387,13 @@ def legend_labels(settings: MosaicSettings, languages: list[str]) -> list[list[s
     if settings.fill == "tones":
         keys = [f"pdf.mosaic_tone.{name}" for name in TONE_NAMES[settings.tones]]
     else:
-        keys = [f"pdf.mosaic_pattern.{name}" for name in PATTERNS[settings.tones]]
+        keys = [f"pdf.mosaic_pattern.{name}" for name in patterns(settings)]
     return [i18n.t_all(key, languages) for key in keys]
 
 
 def draw_legend(c: Canvas, settings: MosaicSettings, box: Box, fonts: Fonts, languages: list[str]) -> None:
-    """One item per tone across ``box``: the symbol, an arrow, a swatch, and its name below."""
+    """One item per tone across ``box``: its number (white has none unless numbered), an
+    arrow, a swatch, and its name below."""
     x, y, w, h = box
     labels = legend_labels(settings, languages)
     item = w / settings.tones
@@ -388,7 +408,10 @@ def draw_legend(c: Canvas, settings: MosaicSettings, box: Box, fonts: Fonts, lan
         c.setFillColor(INK)
         c.setLineWidth(0.6)
         c.rect(cell_x, bottom, swatch, swatch)
-        _symbol(c, settings, tone, cell_x + swatch / 2, bottom + swatch / 2, swatch * 0.55, fonts.bold)
+        if tone < settings.tones - 1 or settings.number_white:
+            size = swatch * 0.55
+            c.setFont(fonts.bold, size)
+            c.drawCentredString(cell_x + swatch / 2, bottom + swatch / 2 - size * 0.35, str(tone + 1))
         c.setFont(fonts.regular, swatch * 0.5)
         c.drawCentredString(center, bottom + swatch * 0.32, "→")
         path = c.beginPath()

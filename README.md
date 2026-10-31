@@ -36,7 +36,7 @@ are dropped, solid black areas become outlines, lines are thickened for small ha
 "photo of a printed page" is cut down to the drawing. See the [spike](docs/spike.md) for what
 the model gets wrong and how each case is handled.
 
-Without the AI, a photo can also become a **mystery mosaic**: a faint grid with a symbol in every
+Without the AI, a photo can also become a **mystery mosaic**: a faint grid with a number in every
 cell and a legend that says how to fill each one. Color it in and the picture appears; the
 solutions are at the end of the book.
 

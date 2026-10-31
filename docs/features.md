@@ -15,8 +15,9 @@ part.
   you don't want (after a confirmation).
 - **A free draft mode** to lay out a book before spending anything.
 - **Mystery mosaics** (monochrome color-by-number), free and offline: the photo becomes a faint
-  grid with a number, letter, sign or shape in each cell; filled in as the legend says (pencil
-  tones or black-pen patterns), the picture appears. Square cells or cells split diagonally,
+  grid with a number in each cell; filled in as the legend says (pencil tones, or one of four
+  black-pen pattern palettes: classic, lines, stippling, geometric), the picture appears. White
+  cells can go without a number, so the finished picture stays clean. Square cells or cells split diagonally,
   2 to 5 tones, the grid size and the contrast are adjustable; the page hides its title and photo,
   and the solutions are printed at the end of the book.
 - **Activities from your own pages**: a word search with the book's words, a maze, a

@@ -18,7 +18,6 @@ from app.core.schema import (
     LICENSES,
     MOSAIC_CELLS,
     MOSAIC_FILLS,
-    MOSAIC_SYMBOLS,
     STYLES,
     Book,
     Caption,
@@ -191,7 +190,7 @@ def _approve(slug: str, page_id: str, next_id: str | None) -> None:
         st.session_state.wb_page = next_id
 
 
-MOSAIC_FIELDS = ("symbols", "fill", "cells", "tones", "columns", "contrast", "brightness")
+MOSAIC_FIELDS = ("fill", "cells", "tones", "columns", "contrast", "brightness", "number_white")
 
 
 def _mosaic_from_widgets(page_id: str) -> MosaicSettings:
@@ -214,15 +213,11 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
         for field in MOSAIC_FIELDS:
             seed(f"mosaic_{field}_{page.id}", getattr(settings, field))
         save = {"on_change": _save_mosaic, "args": (book.slug, page.id)}
-        col1, col2 = st.columns(2)
-        col1.selectbox(
-            t("wb.mosaic_symbols"), MOSAIC_SYMBOLS, format_func=lambda s: t(f"mosaic_symbols.{s}"),
-            key=f"mosaic_symbols_{page.id}", **save,
-        )
-        col2.selectbox(
+        st.selectbox(
             t("wb.mosaic_fill"), MOSAIC_FILLS, format_func=lambda f: t(f"mosaic_fill.{f}"),
             key=f"mosaic_fill_{page.id}", **save,
         )
+        col1, col2 = st.columns(2)
         col1.radio(
             t("wb.mosaic_cells"), MOSAIC_CELLS, format_func=lambda c: t(f"mosaic_cells.{c}"), horizontal=True,
             key=f"mosaic_cells_{page.id}", **save,
@@ -239,6 +234,10 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
         col1, col2 = st.columns(2)
         col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
         col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
+        st.checkbox(
+            t("wb.mosaic_number_white"), help=t("wb.mosaic_number_white_help"),
+            key=f"mosaic_number_white_{page.id}", **save,
+        )
         st.caption(t("wb.mosaic_preview"))
         _render_mosaic_tabs(book, page, draft=True)
         col1, col2 = st.columns(2)

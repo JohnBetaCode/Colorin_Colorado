@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Style = Literal["realistic", "cartoon", "kawaii", "mandala"]
 AgeGroup = Literal["3-5", "6-8", "9+", "adult"]
@@ -18,10 +18,9 @@ PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
 Marketplace = Literal["us", "uk", "es"]
 Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
 Engine = Literal["gemini", "draft", "mosaic"]
-# Mystery mosaics (mosaic.py): the symbol printed in each cell, how each symbol is filled in,
-# and whether cells are whole squares or split along a diagonal into two triangles.
-MosaicSymbols = Literal["numbers", "letters", "signs", "shapes"]
-MosaicFill = Literal["tones", "patterns"]
+# Mystery mosaics (mosaic.py): how each number is filled in (pencil tones or a palette of pen
+# patterns), and whether cells are whole squares or split along a diagonal into two triangles.
+MosaicFill = Literal["tones", "classic", "lines", "stipple", "geometric"]
 MosaicCells = Literal["square", "diagonal"]
 Status = Literal["pending", "converted", "approved"]
 Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
@@ -43,8 +42,7 @@ PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
 ENGINES: tuple[Engine, ...] = ("gemini", "draft", "mosaic")
-MOSAIC_SYMBOLS: tuple[MosaicSymbols, ...] = ("numbers", "letters", "signs", "shapes")
-MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "patterns")
+MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "classic", "lines", "stipple", "geometric")
 MOSAIC_CELLS: tuple[MosaicCells, ...] = ("square", "diagonal")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
 INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
@@ -62,13 +60,22 @@ LICENSES_WITH_CREDIT: tuple[License, ...] = ("cc_by", "cc_by_sa")  # the credit 
 class MosaicSettings(BaseModel):
     """How a photo becomes a mystery mosaic. ``mosaic.default_settings`` gives the age group's."""
 
-    symbols: MosaicSymbols = "numbers"
     fill: MosaicFill = "tones"
     cells: MosaicCells = "square"
     tones: int = 4  # 2 to 5, from black to white
     columns: int = 30
     contrast: int = 0  # percent, -50 to 50
     brightness: int = 0  # percent, -50 to 50
+    # White cells carry a number too: the picture stays hidden until colored, but the finished
+    # page shows those digits.
+    number_white: bool = False
+
+    @field_validator("fill", mode="before")
+    @classmethod
+    def _one_palette_before(cls, value):
+        # The first version had a single pattern set, saved as "patterns" (and a "symbols"
+        # choice, now always numbers, which is simply ignored).
+        return "classic" if value == "patterns" else value
 
 
 class CoverArt(BaseModel):

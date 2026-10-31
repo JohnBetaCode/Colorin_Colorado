@@ -18,7 +18,6 @@ from app.core.schema import (
     MARKETPLACES,
     MOSAIC_CELLS,
     MOSAIC_FILLS,
-    MOSAIC_SYMBOLS,
     PAGE_SIZES,
     STATUSES,
     STYLES,
@@ -69,11 +68,10 @@ def test_every_option_and_warning_has_a_label():
         "template_subtitle": TEMPLATES,
         "template_labels": [k for k in TEMPLATES if k != "free"],
         "export.extra_missing": ("word_search", "dots", "solutions"),
-        "mosaic_symbols": MOSAIC_SYMBOLS,
         "mosaic_fill": MOSAIC_FILLS,
         "mosaic_cells": MOSAIC_CELLS,
         "pdf.mosaic_tone": {name for names in mosaic.TONE_NAMES.values() for name in names},
-        "pdf.mosaic_pattern": {name for names in mosaic.PATTERNS.values() for name in names},
+        "pdf.mosaic_pattern": {name for names in mosaic.PALETTES.values() for name in names} | {"empty"},
     }
     missing = [f"{p}.{v}" for p, values in prefixes.items() for v in values if f"{p}.{v}" not in STRINGS]
     assert missing == []
