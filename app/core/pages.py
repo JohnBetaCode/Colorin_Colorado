@@ -17,7 +17,7 @@ from pillow_heif import register_heif_opener
 
 from app.core import lineart, tones
 from app.core.books import book_path
-from app.core.schema import Crop, Page, Version
+from app.core.schema import Crop, Page, SubjectPoint, Version
 
 register_heif_opener()
 
@@ -172,8 +172,28 @@ def approve(slug: str, page_id: str) -> Page:
     return update_page(slug, page_id, status="approved")
 
 
+def _points_in_crop(points: list[SubjectPoint], old: Crop, new: Crop) -> list[SubjectPoint]:
+    """SAM2 points (percent of the old crop) moved to the new crop, so each stays on the same
+    spot of the photo; the ones the new crop leaves out are dropped."""
+    moved = []
+    for point in points:
+        x = old.left + point.x / 100 * (old.right - old.left)  # fraction of the whole photo
+        y = old.top + point.y / 100 * (old.bottom - old.top)
+        nx = (x - new.left) / (new.right - new.left) * 100
+        ny = (y - new.top) / (new.bottom - new.top) * 100
+        if 0 <= nx <= 100 and 0 <= ny <= 100:
+            moved.append(point.model_copy(update={"x": round(nx, 1), "y": round(ny, 1)}))
+    return moved
+
+
 def set_crop(slug: str, page_id: str, crop: Crop) -> Page:
-    return update_page(slug, page_id, crop=crop)
+    """Crop the page's photo. Its SAM2 points follow the photo, and those cropped out go."""
+    page = get_page(slug, page_id)
+    fields: dict = {"crop": crop}
+    if page and page.mosaic and page.mosaic.points:
+        points = _points_in_crop(page.mosaic.points, page.crop, crop)
+        fields["mosaic"] = page.mosaic.model_copy(update={"points": points})
+    return update_page(slug, page_id, **fields)
 
 
 def move_page(slug: str, page_id: str, delta: int) -> None:

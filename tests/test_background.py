@@ -10,7 +10,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from app.core import background, books, imaging, mosaic, pages
-from app.core.schema import MosaicSettings, SubjectPoint
+from app.core.schema import Crop, MosaicSettings, SubjectPoint
 
 from .conftest import png_bytes
 
@@ -104,6 +104,20 @@ def test_the_tone_curve_does_not_cut_again(fake_sam):
     page = pages.update_page(book.slug, page.id, curve=[(0, 0), (128, 200), (255, 255)])
     background.subject_mask(book.slug, page, page.mosaic)
     assert len(fake_sam) == 1  # same mask, from the cache
+
+
+def test_points_follow_the_crop_and_the_ones_left_out_go(fake_sam):
+    book, page = _page(png_bytes(_bird_on_grass()))
+    points = [SubjectPoint(x=50, y=50), SubjectPoint(x=90, y=10, subject=False), SubjectPoint(x=25, y=75)]
+    page = pages.update_page(book.slug, page.id, mosaic=page.mosaic.model_copy(update={"points": points}))
+    page = pages.set_crop(book.slug, page.id, Crop(left=0.0, top=0.0, right=0.5, bottom=1.0))
+    # The middle of the photo is now the right edge; the red point (right half) is cropped out.
+    assert page.mosaic.points == [SubjectPoint(x=100, y=50), SubjectPoint(x=50, y=75)]
+    page = pages.set_crop(book.slug, page.id, Crop())  # back to the whole photo
+    assert page.mosaic.points == [SubjectPoint(x=50, y=50), SubjectPoint(x=25, y=75)]
+    page = pages.set_crop(book.slug, page.id, Crop(left=0.6, top=0.0, right=1.0, bottom=0.4))
+    assert page.mosaic.points == []  # none left: the middle of the crop is the subject again
+    assert background.hints(page.mosaic) == [SubjectPoint(x=50, y=50)]
 
 
 def test_a_point_saved_before_clicks_still_loads():
