@@ -8,7 +8,7 @@ from app.core import books, gemini, i18n, pages, usage
 from app.core.config import AUTH_METHODS, LANGUAGES, get_settings, save_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, STYLES
-from app.ui.common import language_switch, seed, show_flash
+from app.ui.common import flash, language_switch, seed, show_flash
 
 
 def _render_settings_panel() -> None:
@@ -120,6 +120,29 @@ def _render_create_form() -> None:
             st.rerun()
 
 
+def _duplicate(slug: str) -> None:
+    source = books.load_book(slug)
+    copy = books.duplicate_book(slug, t("home.copy_title", title=source.title))
+    flash("success", t("home.duplicated", title=copy.title))
+
+
+def _render_import() -> None:
+    with st.expander(t("home.import")):
+        st.caption(t("home.import_help"))
+        # A new key empties the uploader once the book is imported.
+        key = f"import_{st.session_state.get('import_round', 0)}"
+        file = st.file_uploader(t("home.import_label"), type=["zip"], key=key)
+        if file and st.button(t("home.import_button"), type="primary"):
+            try:
+                book = books.import_zip(file.getvalue())
+            except ValueError as exc:
+                st.error(t("home.import_failed", error=exc))
+                return
+            st.session_state.import_round = st.session_state.get("import_round", 0) + 1
+            flash("success", t("home.imported", title=book.title))
+            st.rerun()
+
+
 def _render_book_list() -> None:
     st.subheader(t("home.your_books"))
     all_books = books.list_books()
@@ -162,6 +185,26 @@ def _render_book_list() -> None:
                     on_click=_open_book,
                     args=(book.slug,),
                 )
+                st.button(
+                    t("home.duplicate"),
+                    key=f"duplicate_{book.slug}",
+                    width="stretch",
+                    on_click=_duplicate,
+                    args=(book.slug,),
+                )
+                if st.session_state.get("zip_ready") == book.slug:
+                    st.download_button(
+                        t("home.download_zip"),
+                        data=books.export_zip(book.slug),
+                        file_name=f"{book.slug}.zip",
+                        mime="application/zip",
+                        key=f"zip_download_{book.slug}",
+                        width="stretch",
+                        on_click="ignore",
+                    )
+                elif st.button(t("home.zip"), key=f"zip_{book.slug}", help=t("home.zip_help"), width="stretch"):
+                    st.session_state.zip_ready = book.slug
+                    st.rerun()
                 if st.button(t("home.delete"), key=f"delete_{book.slug}", width="stretch"):
                     st.session_state.pending_delete = book.slug
 
@@ -187,5 +230,6 @@ def render_home() -> None:
     _render_settings_panel()
     _render_usage_panel()
     _render_create_form()
+    _render_import()
     st.divider()
     _render_book_list()

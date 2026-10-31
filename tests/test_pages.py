@@ -1,3 +1,6 @@
+import io
+import zipfile
+
 import pytest
 from PIL import Image
 
@@ -86,3 +89,54 @@ def test_aspect_follows_the_photo():
     assert imaging.aspect_for(4000, 3000) == "4:3"
     assert imaging.aspect_for(3000, 4000) == "3:4"
     assert imaging.aspect_for(1000, 1050) == "1:1"
+
+
+def _book_with_a_version(photo, line_art):
+    book = books.create_book("Aves del jardín")
+    page = pages.add_photo(book.slug, "tucan.png", photo)
+    version = Version(n=0, engine="draft", style="realistic", age_group="6-8", background="simplify", created_at="now")
+    pages.add_version(book.slug, page.id, version, line_art, lineart.clean(line_art, "6-8").image)
+    pages.update_page(book.slug, page.id, title="Tucán", credit="Foto propia")
+    (books.book_path(book.slug) / "exports" / "old.pdf").write_bytes(b"%PDF")
+    return books.load_book(book.slug), page
+
+
+def test_duplicate_copies_everything_but_exports_under_a_new_id(photo, line_art):
+    book, page = _book_with_a_version(photo, line_art)
+    copy = books.duplicate_book(book.slug, "Aves del jardín (copia)")
+    assert copy.id != book.id and copy.slug != book.slug and copy.title == "Aves del jardín (copia)"
+    copied = pages.load_pages(copy.slug)
+    assert [(p.id, p.title, p.credit) for p in copied] == [(page.id, "Tucán", "Foto propia")]
+    assert pages.selected_path(copy.slug, copied[0]).exists()
+    assert list((books.book_path(copy.slug) / "exports").iterdir()) == []
+
+
+def test_zip_round_trip_makes_a_new_book(photo, line_art):
+    book, page = _book_with_a_version(photo, line_art)
+    data = books.export_zip(book.slug)
+    names = set(zipfile.ZipFile(io.BytesIO(data)).namelist())
+    assert {"book.json", "pages.json", f"originals/{page.original}", f"lineart/{page.id}/v1.png"} <= names
+    assert not any(name.startswith("exports/") for name in names)
+    imported = books.import_zip(data)
+    assert imported.id != book.id and imported.slug != book.slug and imported.title == book.title
+    restored = pages.load_pages(imported.slug)
+    assert restored[0].title == "Tucán" and pages.selected_path(imported.slug, restored[0]).exists()
+
+
+def test_import_rejects_other_zips_and_unsafe_paths(photo, line_art):
+    with pytest.raises(ValueError):
+        books.import_zip(b"not a zip")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("readme.txt", "hello")
+    with pytest.raises(ValueError):
+        books.import_zip(buffer.getvalue())
+
+    book, _ = _book_with_a_version(photo, line_art)
+    buffer = io.BytesIO(books.export_zip(book.slug))
+    with zipfile.ZipFile(buffer, "a") as archive:
+        archive.writestr("../escape.txt", "nope")
+        archive.writestr("originals/../../escape.txt", "nope")
+    imported = books.import_zip(buffer.getvalue())
+    assert not (books.BOOKS_DIR / "escape.txt").exists() and not (books.BOOKS_DIR.parent / "escape.txt").exists()
+    assert pages.load_pages(imported.slug)
