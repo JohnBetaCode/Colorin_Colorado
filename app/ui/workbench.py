@@ -25,9 +25,11 @@ from app.core.schema import (
     Engine,
     MosaicSettings,
     Page,
+    SubjectPoint,
     Version,
 )
 from app.ui.common import flash, seed
+from app.ui.point_picker import point_picker
 
 MIN_CROP = 10  # percent of the photo on each axis
 PREVIEW_PX = 1000  # long side of the mosaic solution shown in the workbench
@@ -191,17 +193,32 @@ def _approve(slug: str, page_id: str, next_id: str | None) -> None:
 
 
 MOSAIC_FIELDS = (
-    "fill", "cells", "tones", "columns", "contrast", "brightness", "number_white",
-    "remove_background", "subject_x", "subject_y",
+    "fill", "cells", "tones", "columns", "contrast", "brightness", "number_white", "remove_background",
 )
 
 
-def _mosaic_from_widgets(page_id: str) -> MosaicSettings:
-    return MosaicSettings(**{field: st.session_state[f"mosaic_{field}_{page_id}"] for field in MOSAIC_FIELDS})
+def _mosaic_from_widgets(page_id: str, points: list[SubjectPoint] | None = None) -> MosaicSettings:
+    values = {field: st.session_state[f"mosaic_{field}_{page_id}"] for field in MOSAIC_FIELDS}
+    return MosaicSettings(**values, points=points or [])
 
 
-def _save_mosaic(slug: str, page_id: str) -> None:
-    pages.update_page(slug, page_id, mosaic=_mosaic_from_widgets(page_id))
+def _page_points(slug: str, page_id: str) -> list[SubjectPoint]:
+    """The page's SAM2 points: they belong to its photo, never to the book's settings."""
+    page = pages.get_page(slug, page_id)
+    return list(page.mosaic.points) if page and page.mosaic else []
+
+
+def _save_mosaic(slug: str, page_id: str, points: list[SubjectPoint] | None = None) -> None:
+    points = _page_points(slug, page_id) if points is None else points
+    pages.update_page(slug, page_id, mosaic=_mosaic_from_widgets(page_id, points))
+
+
+def _drop_last_point(slug: str, page_id: str) -> None:
+    _save_mosaic(slug, page_id, _page_points(slug, page_id)[:-1])
+
+
+def _drop_points(slug: str, page_id: str) -> None:
+    _save_mosaic(slug, page_id, [])
 
 
 def _mosaic_for_book(book: Book, page_id: str) -> None:
@@ -252,10 +269,7 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
             st.warning(t("wb.sam_missing"))
             ready = False
         elif settings.remove_background:
-            col1, col2 = st.columns(2)
-            col1.slider(t("wb.mosaic_subject_x"), 0, 100, key=f"mosaic_subject_x_{page.id}", **save)
-            col2.slider(t("wb.mosaic_subject_y"), 0, 100, key=f"mosaic_subject_y_{page.id}", **save)
-            ready = _render_subject(book, page)
+            ready = _render_subject(book, page, settings)
         if ready:
             st.caption(t("wb.mosaic_preview"))
             _render_mosaic_tabs(book, page, draft=True)
@@ -287,26 +301,41 @@ def _mosaic_images(book_json: str, page_json: str, draft: bool) -> tuple[Image.I
 
 @st.cache_data(max_entries=16, show_spinner=False)
 def _subject_outline(book_json: str, page_json: str) -> Image.Image:
-    """The photo with SAM2's cut and the subject point, to check what stays."""
+    """The photo with SAM2's cut (the background faded), to check what stays."""
     book, page = Book.model_validate_json(book_json), Page.model_validate_json(page_json)
-    settings = mosaic.settings_for(book, page)
-    mask = background.subject_mask(book.slug, page, settings)
-    image = background.outline(pages.cropped_photo(book.slug, page), mask, (settings.subject_x, settings.subject_y))
+    mask = background.subject_mask(book.slug, page, mosaic.settings_for(book, page))
+    image = background.outline(pages.cropped_photo(book.slug, page), mask)
     image.thumbnail((PREVIEW_PX, PREVIEW_PX))
     return image
 
 
-def _render_subject(book: Book, page: Page) -> bool:
-    """Show what SAM2 keeps; False (with the error shown) when it cannot."""
+def _render_subject(book: Book, page: Page, settings: MosaicSettings) -> bool:
+    """SAM2's cut, with the points it was made from; a click adds a point. False (with the
+    error shown) when SAM2 cannot cut."""
     first = not background.model_downloaded()
     with st.spinner(t("wb.sam_downloading", mb=background.MODEL_MB) if first else t("wb.sam_working")):
         try:
             image = _subject_outline(book.model_dump_json(), page.model_dump_json())
         except background.BackgroundError as exc:
             st.error(t("wb.sam_failed", error=exc))
-            return False
-    st.image(image, caption=t("wb.mosaic_subject_caption"), width="stretch")
-    return True
+            image = None
+    st.caption(t("wb.mosaic_points_help"))
+    if image is not None:
+        shown = [p.model_dump() for p in background.hints(settings)]
+        click = point_picker(image, shown, key=f"points_{page.id}")
+        if click:
+            _save_mosaic(book.slug, page.id, background.clicked(settings, SubjectPoint(**click)))
+            st.rerun()
+    col1, col2 = st.columns(2)
+    col1.button(
+        t("wb.mosaic_points_undo"), width="stretch", disabled=not settings.points,
+        key=f"points_undo_{page.id}", on_click=_drop_last_point, args=(book.slug, page.id),
+    )
+    col2.button(
+        t("wb.mosaic_points_clear"), width="stretch", disabled=not settings.points,
+        key=f"points_clear_{page.id}", on_click=_drop_points, args=(book.slug, page.id),
+    )
+    return image is not None
 
 
 def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:

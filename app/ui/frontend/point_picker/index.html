@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  Point picker for SAM2 hints (app/ui/point_picker.py): the photo with SAM2's cut, and the
+  author's points over it. Left click: part of the subject (green +). Right click or
+  Shift+click: background (red −). Plain Streamlit component protocol, no build step: each
+  click is sent once, with a ``click`` id the Python side uses to ignore repeats.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  #wrap { position: relative; width: 100%; user-select: none; -webkit-user-select: none; }
+  img { display: block; width: 100%; height: auto; cursor: crosshair; border-radius: 6px; }
+  .point {
+    position: absolute; width: 20px; height: 20px; margin: -12px 0 0 -12px; border-radius: 50%;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); pointer-events: none;
+    color: #fff; font: bold 16px/20px sans-serif; text-align: center;
+  }
+  .subject { background: #1a9b3c; }
+  .background { background: #d62828; }
+</style>
+</head>
+<body>
+<div id="wrap"><img id="photo" alt=""></div>
+<script>
+  const photo = document.getElementById("photo");
+  const wrap = document.getElementById("wrap");
+
+  function send(type, data) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data), "*");
+  }
+
+  function fitHeight() {
+    send("streamlit:setFrameHeight", { height: Math.ceil(wrap.getBoundingClientRect().height) });
+  }
+
+  function drawPoints(points) {
+    wrap.querySelectorAll(".point").forEach((dot) => dot.remove());
+    for (const p of points) {
+      const dot = document.createElement("div");
+      dot.className = "point " + (p.subject ? "subject" : "background");
+      dot.textContent = p.subject ? "+" : "−";
+      dot.style.left = p.x + "%";
+      dot.style.top = p.y + "%";
+      wrap.appendChild(dot);
+    }
+  }
+
+  function pick(event, subject) {
+    event.preventDefault();
+    const box = photo.getBoundingClientRect();
+    const x = ((event.clientX - box.left) / box.width) * 100;
+    const y = ((event.clientY - box.top) / box.height) * 100;
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
+    const value = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, subject: subject, click: Date.now() };
+    send("streamlit:setComponentValue", { value: value, dataType: "json" });
+  }
+
+  photo.addEventListener("click", (event) => pick(event, !event.shiftKey));
+  photo.addEventListener("contextmenu", (event) => pick(event, false));
+  photo.addEventListener("load", fitHeight);
+  window.addEventListener("resize", fitHeight);
+
+  window.addEventListener("message", (event) => {
+    if (!event.data || event.data.type !== "streamlit:render") return;
+    const args = event.data.args;
+    if (photo.dataset.source !== args.image) {
+      photo.dataset.source = args.image;
+      photo.src = args.image;
+    }
+    drawPoints(args.points || []);
+    fitHeight();
+  });
+
+  send("streamlit:componentReady", { apiVersion: 1 });
+</script>
+</body>
+</html>

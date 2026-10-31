@@ -1,11 +1,12 @@
 """Background removal for mystery mosaics, with SAM2 (Segment Anything 2), offline.
 
-The author points at the subject (the middle of the cropped photo unless moved) and SAM2
-returns its mask; everything else becomes white paper, so a mosaic is only the bird, not
+The author clicks points on the photo: on the subject (left click) or on the background
+(right click); with none, the middle of the cropped photo is the subject. SAM2 returns the
+subject's mask and everything else becomes white paper, so a mosaic is only the bird, not
 the grass behind it. The model is SAM 2.1 base-plus, the middle size, through
 ``transformers``: its weights are public on Hugging Face and download by themselves the
 first time (about 320 MB, under ``models/``, which Compose mounts). Masks are cached in
-``books/<slug>/masks/``, keyed by the crop, the point and the model, because SAM2 takes a
+``books/<slug>/masks/``, keyed by the crop, the points and the model, because SAM2 takes a
 few seconds on a CPU.
 
 ``torch`` and ``transformers`` are imported only when a mask is needed, so everything
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import math
 import threading
 from functools import lru_cache
 from pathlib import Path
@@ -26,11 +28,12 @@ from PIL import Image
 
 from app.core import pages
 from app.core.books import book_path
-from app.core.schema import MosaicSettings, Page
+from app.core.schema import MosaicSettings, Page, SubjectPoint
 
 MODEL_ID = "facebook/sam2.1-hiera-base-plus"
 MODEL_MB = 320  # download size, shown before the first use
 MIN_PART = 0.01  # pieces of the mask smaller than this share of it are dropped (specks)
+POINT_REACH = 3.0  # percent of the photo: a click this close to a point removes it
 
 _lock = threading.Lock()
 
@@ -63,15 +66,19 @@ def _model():
     return Sam2Processor.from_pretrained(MODEL_ID), Sam2Model.from_pretrained(MODEL_ID).eval()
 
 
-def _predict(image: Image.Image, point: tuple[float, float]) -> np.ndarray:
-    """SAM2's best mask (bool, image size) for the object under ``point`` (pixels)."""
+def _predict(image: Image.Image, points: list[tuple[float, float]], labels: list[int]) -> np.ndarray:
+    """SAM2's best mask (bool, image size) for one object: ``points`` in pixels, labeled 1
+    (part of it) or 0 (not part of it)."""
     import torch
 
     with _lock:  # one model, shared by the app's threads
         processor, model = _model()
-        inputs = processor(images=image, input_points=[[[list(point)]]], input_labels=[[[1]]], return_tensors="pt")
+        inputs = processor(
+            images=image, input_points=[[[list(p) for p in points]]], input_labels=[[labels]], return_tensors="pt"
+        )
         with torch.inference_mode():
-            output = model(**inputs, multimask_output=True)
+            # One point is ambiguous (the bird, its head, the branch): take the best of three.
+            output = model(**inputs, multimask_output=len(points) == 1)
         masks = processor.post_process_masks(output.pred_masks, inputs["original_sizes"])[0][0]
         best = int(output.iou_scores[0, 0].argmax())
     return masks[best].numpy().astype(bool)
@@ -91,9 +98,27 @@ def _clean(mask: np.ndarray) -> np.ndarray:
     return solid.astype(bool) | holes
 
 
-def _cache_path(slug: str, page: Page, point: tuple[int, int]) -> Path:
+def hints(settings: MosaicSettings) -> list[SubjectPoint]:
+    """The author's points, or the middle of the photo as the subject when there is none."""
+    points = list(settings.points)
+    if not any(p.subject for p in points):
+        points.insert(0, SubjectPoint(x=50, y=50))
+    return points
+
+
+def clicked(settings: MosaicSettings, click: SubjectPoint) -> list[SubjectPoint]:
+    """The points after a click on the photo: on a point, it goes; elsewhere, ``click`` is
+    added. It starts from the points shown, so the middle of the photo (the subject while
+    there is none) stays unless clicked away."""
+    shown = hints(settings)
+    near = next((p for p in shown if math.hypot(p.x - click.x, p.y - click.y) <= POINT_REACH), None)
+    return [p for p in shown if p is not near] if near else [*shown, click]
+
+
+def _cache_path(slug: str, page: Page, points: list[SubjectPoint]) -> Path:
     crop = page.crop
-    key = f"{MODEL_ID}|{crop.left},{crop.top},{crop.right},{crop.bottom}|{point[0]},{point[1]}"
+    hints_key = ";".join(f"{p.x:.1f},{p.y:.1f},{int(p.subject)}" for p in points)
+    key = f"{MODEL_ID}|{crop.left},{crop.top},{crop.right},{crop.bottom}|{hints_key}"
     digest = hashlib.sha1(key.encode()).hexdigest()[:12]
     return book_path(slug) / "masks" / f"{page.id}-{digest}.png"
 
@@ -101,10 +126,14 @@ def _cache_path(slug: str, page: Page, point: tuple[int, int]) -> Path:
 def subject_mask(slug: str, page: Page, settings: MosaicSettings) -> np.ndarray:
     """The subject of the page's cropped photo (bool, photo size), from the cache or SAM2.
 
-    Raises ``BackgroundError`` when SAM2 is not installed or finds nothing at the point.
+    Each subject point is cut out on its own, with every background point, and the cuts are
+    joined: two birds apart stay two whole birds (as one object SAM2 mixes them up), and a
+    second point on the same bird adds what the first one missed.
+
+    Raises ``BackgroundError`` when SAM2 is not installed or finds nothing at the points.
     """
-    point = (settings.subject_x, settings.subject_y)
-    path = _cache_path(slug, page, point)
+    points = hints(settings)
+    path = _cache_path(slug, page, points)
     if path.exists():
         with Image.open(path) as cached:
             return np.asarray(cached.convert("L")) > 127
@@ -112,21 +141,24 @@ def subject_mask(slug: str, page: Page, settings: MosaicSettings) -> np.ndarray:
         raise BackgroundError("SAM2 is not installed: rebuild the Docker image.")
     photo = pages.cropped_photo(slug, page)
     w, h = photo.size
-    mask = _clean(_predict(photo, (w * point[0] / 100, h * point[1] / 100)))
+
+    def pixels(p: SubjectPoint) -> tuple[float, float]:
+        return w * p.x / 100, h * p.y / 100
+
+    away = [pixels(p) for p in points if not p.subject]
+    mask = np.zeros((h, w), bool)
+    for point in (p for p in points if p.subject):
+        mask |= _predict(photo, [pixels(point), *away], [1] + [0] * len(away))
+    mask = _clean(mask)
     if not mask.any():
-        raise BackgroundError("SAM2 found no subject at that point.")
+        raise BackgroundError("SAM2 found no subject at those points.")
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(mask.astype(np.uint8) * 255).save(path)
     return mask
 
 
-def outline(photo: Image.Image, mask: np.ndarray, point: tuple[int, int]) -> Image.Image:
-    """The photo with the background faded and the subject point marked, to check the cut."""
+def outline(photo: Image.Image, mask: np.ndarray) -> Image.Image:
+    """The photo with the background faded, to check the cut."""
     rgb = np.asarray(photo.convert("RGB")).copy()
     rgb[~mask] = (rgb[~mask] * 0.25 + 191).astype(np.uint8)
-    h, w = mask.shape
-    center = (round(w * point[0] / 100), round(h * point[1] / 100))
-    radius = max(6, max(w, h) // 80)
-    cv2.circle(rgb, center, radius + 3, (255, 255, 255), -1)
-    cv2.circle(rgb, center, radius, (220, 30, 30), -1)
     return Image.fromarray(rgb)

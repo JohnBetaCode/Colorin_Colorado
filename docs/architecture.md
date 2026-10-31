@@ -128,9 +128,15 @@ sheets (six per page, filled in, with number and title) after the activities, be
 and closing page. Mosaics are left out of the word search and the connect-the-dots.
 
 **Background removal.** With `remove_background`, `background.subject_mask` asks SAM2 for the
-object under the subject point (percent of the cropped photo, the middle by default) with one
-positive point, keeps the best of its three masks by predicted IoU, drops specks under 1% of it
-and fills its holes. `make_grid` then measures the tone range on the subject's pixels alone and
+subject from the page's `points` (percent of the cropped photo; with no subject point, the middle
+is one). The author adds them by clicking the photo in the workbench (`ui/point_picker.py`, a
+static HTML component: left click subject, right click or Shift+click background, a click on a
+point removes it; `background.clicked` decides, and keeps the middle point shown before the first
+click). Each subject
+point is a SAM2 call of its own with every background point as a negative, and the masks are
+joined: prompting two birds as one object made SAM2 mix them up, while one call per point keeps
+both whole. A single point takes the best of three masks by predicted IoU. The joined mask drops
+specks under 1% of it and fills its holes. `make_grid` then measures the tone range on the subject's pixels alone and
 blends every sample toward white by the share of background under it, so the background is white
 cells (without numbers) and the subject's edge follows the mask. On a CPU the model loads in about
 20 s once per process and takes 2–3 s per photo, hence the mask cache. The model's weights are in

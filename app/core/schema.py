@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Style = Literal["realistic", "cartoon", "kawaii", "mandala"]
 AgeGroup = Literal["3-5", "6-8", "9+", "adult"]
@@ -57,6 +57,14 @@ LICENSES_NOT_FOR_SALE: tuple[License, ...] = ("non_commercial", "no_derivatives"
 LICENSES_WITH_CREDIT: tuple[License, ...] = ("cc_by", "cc_by_sa")  # the credit must be printed
 
 
+class SubjectPoint(BaseModel):
+    """A hint for SAM2, in percent of the cropped photo: part of the subject, or background."""
+
+    x: float
+    y: float
+    subject: bool = True
+
+
 class MosaicSettings(BaseModel):
     """How a photo becomes a mystery mosaic. ``mosaic.default_settings`` gives the age group's."""
 
@@ -69,11 +77,10 @@ class MosaicSettings(BaseModel):
     # White cells carry a number too: the picture stays hidden until colored, but the finished
     # page shows those digits.
     number_white: bool = False
-    # SAM2 cuts out the subject under this point (percent of the cropped photo) and the
-    # background becomes white (background.py).
+    # SAM2 cuts out the subject and the background becomes white (background.py). Points say
+    # what is subject and what is background; with none, the middle of the photo is the subject.
     remove_background: bool = False
-    subject_x: int = 50
-    subject_y: int = 50
+    points: list[SubjectPoint] = Field(default_factory=list)
 
     @field_validator("fill", mode="before")
     @classmethod
@@ -81,6 +88,16 @@ class MosaicSettings(BaseModel):
         # The first version had a single pattern set, saved as "patterns" (and a "symbols"
         # choice, now always numbers, which is simply ignored).
         return "classic" if value == "patterns" else value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_point_before(cls, data):
+        # Before points, one subject point was saved as subject_x/subject_y.
+        if isinstance(data, dict) and "subject_x" in data and not data.get("points"):
+            x, y = data.pop("subject_x"), data.pop("subject_y", 50)
+            if (x, y) != (50, 50):
+                data["points"] = [{"x": x, "y": y}]
+        return data
 
 
 class CoverArt(BaseModel):

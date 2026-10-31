@@ -321,19 +321,19 @@ STRINGS: dict[str, dict[str, str]] = {
     "mosaic_fill.geometric": {"es": "Geométricos (ajedrez, zigzag, guiones)", "en": "Geometric (checkers, zigzag, dashes)"},
     "wb.mosaic_remove_background": {"es": "✂️ Quitar el fondo (SAM2)", "en": "✂️ Remove the background (SAM2)"},
     "wb.mosaic_remove_background_help": {
-        "es": "SAM2 recorta el sujeto que está bajo el punto rojo (el centro de la foto, si no lo mueves) y el resto queda en blanco, sin números. Funciona sin internet y gratis; la primera vez descarga el modelo (unos {mb} MB) y tarda un poco más.",
-        "en": "SAM2 cuts out the subject under the red dot (the middle of the photo unless you move it) and the rest is left white, with no numbers. Works offline and free; the first time it downloads the model (about {mb} MB) and takes a little longer.",
+        "es": "SAM2 recorta el sujeto (el centro de la foto, o lo que marques con clics) y el resto queda en blanco, sin números. Funciona sin internet y gratis; la primera vez descarga el modelo (unos {mb} MB) y tarda un poco más.",
+        "en": "SAM2 cuts out the subject (the middle of the photo, or what you mark with clicks) and the rest is left white, with no numbers. Works offline and free; the first time it downloads the model (about {mb} MB) and takes a little longer.",
     },
     "wb.sam_missing": {
         "es": "SAM2 no está instalado en esta imagen de Docker. Reconstrúyela con «docker compose up -d --build».",
         "en": "SAM2 is not installed in this Docker image. Rebuild it with “docker compose up -d --build”.",
     },
-    "wb.mosaic_subject_x": {"es": "Punto del sujeto: horizontal (%)", "en": "Subject point: horizontal (%)"},
-    "wb.mosaic_subject_y": {"es": "Punto del sujeto: vertical (%)", "en": "Subject point: vertical (%)"},
-    "wb.mosaic_subject_caption": {
-        "es": "Lo que queda del fondo se ve claro. Si SAM2 tomó otra cosa, mueve el punto rojo sobre el sujeto.",
-        "en": "What is left of the background shows faded. If SAM2 took something else, move the red dot onto the subject.",
+    "wb.mosaic_points_help": {
+        "es": "El fondo que se quita se ve claro. **Clic izquierdo**: añade un punto del sujeto (verde +). **Clic derecho** o **Mayús+clic**: un punto de fondo (rojo −). **Clic sobre un punto**: lo quita. Al principio el sujeto es el centro de la foto. Cada punto verde se recorta por separado, así puedes marcar varios animales.",
+        "en": "The background that goes away shows faded. **Left click**: add a subject point (green +). **Right click** or **Shift+click**: a background point (red −). **Click on a point**: remove it. At first the subject is the middle of the photo. Each green point is cut out on its own, so you can mark several animals.",
     },
+    "wb.mosaic_points_undo": {"es": "↩️ Quitar el último punto", "en": "↩️ Remove the last point"},
+    "wb.mosaic_points_clear": {"es": "🗑️ Quitar todos los puntos", "en": "🗑️ Remove all points"},
     "wb.sam_downloading": {
         "es": "Descargando el modelo SAM2 (unos {mb} MB, solo la primera vez)…",
         "en": "Downloading the SAM2 model (about {mb} MB, only the first time)…",
