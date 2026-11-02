@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+import re
+
 import streamlit as st
 
 from app.core import i18n
 from app.core.config import LANGUAGES, save_settings
 from app.core.i18n import LANGUAGE_NAMES
+
+
+_MARKDOWN = re.compile(r"([\\`*_{}\[\]()#+\-.!|<>~$:])")
+
+
+def plain(text: str) -> str:
+    """Escape Markdown in text someone typed or imported, so it shows as typed.
+
+    Titles go into ``st.markdown``, captions and messages; unescaped, a title like
+    ``![](https://…)`` would load an image from anywhere.
+    """
+    return _MARKDOWN.sub(r"\\\1", text)
 
 
 def _save_language() -> None:

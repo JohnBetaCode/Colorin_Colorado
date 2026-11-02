@@ -26,6 +26,10 @@ docker compose up -d --build
 
 Open http://localhost:8502. Once Upon a Time uses port 8501, so both can run at the same time.
 
+The app only answers on this computer. To open it from a phone or another computer on your
+network, start it with `COLORIN_BIND=0.0.0.0 docker compose up -d`; the app has no login, so anyone
+on that network can then use it, see the books and spend your Gemini credit.
+
 The container runs as your host user (`UID`/`GID`, default 1000), so `books/` and `data/` stay
 owned by you. If your user id is not 1000, start it with `UID=$(id -u) GID=$(id -g) docker
 compose up -d`.
@@ -64,6 +68,10 @@ them and can test the connection; **Save & test** sends one cheap text request.
 | `GEMINI_TEXT_MODEL` | `gemini-3.8-flash` | Text model (connection test; caption suggestions later). |
 | `GEMINI_IMAGE_MODEL` | `gemini-3-pro-image` | Image model that draws the coloring pages. |
 | `UI_LANGUAGE` | `es` | App language, `es` or `en`. Also switchable from the sidebar. |
+
+The saved API key is never sent to the browser: the Settings field stays empty, shows the key's last
+four characters, and keeps the saved key unless you type a new one (**Forget the saved API key**
+removes it).
 
 Credentials are never copied into the image: `.dockerignore` keeps `config/.env` (project ID, API
 key) and the user data out of it, and Compose mounts `config/` at run time. The gcloud credentials

@@ -232,6 +232,22 @@ page.
 - Every user-facing string goes through `i18n.t`; `tests/test_i18n.py` checks that every key used
   in `app/` exists in both languages with the same placeholders.
 
+## Security
+
+The app has no login: it is a single-user tool for one computer. What keeps it safe:
+
+| Risk | Measure |
+|---|---|
+| Others on the network using the app (photos, Gemini credit) | Compose publishes the port on `127.0.0.1` only; `COLORIN_BIND` opens it on purpose. |
+| The API key leaking from the UI | The Settings field never receives the saved key; an empty field keeps it. |
+| A book ZIP from someone else reaching outside its folder | Names that become paths (`Book.slug`, `Page.id`, `Page.original`) must match the patterns in `schema.py`, and `books.inside` checks every page path stays in its book; archive entries outside the book layout are skipped, and their total size is capped. |
+| Text from a book (titles, captions) turning into markup | The UI escapes Markdown with `ui.common.plain`; every user string in the PDF goes through `escape` or `plain_markup`, since ReportLab paragraphs read tags like `<img src>`. |
+| Secrets in git or in the image | `config/.env` and the Compose override are git-ignored; `.dockerignore` keeps them and the user data out of the image. |
+| Vulnerable dependencies | Pinned versions, audited with `pip-audit` on 2026-10-31 (none known); Dependabot proposes updates for pip, Docker and the dev container. |
+
+Not covered: the photos and captions sent to Gemini are processed by Google under the terms of the
+chosen access (Vertex AI or AI Studio).
+
 ## Differences from the plan
 
 | Plan | Built | Why |

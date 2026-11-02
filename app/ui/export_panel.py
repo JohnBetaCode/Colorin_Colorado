@@ -9,7 +9,7 @@ import streamlit as st
 from app.core import books, export
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import EXTRAS, PAGE_SIZES, Book, Page
-from app.ui.common import seed
+from app.ui.common import plain, seed
 
 FIRST_PAGE = "first"  # cover option stored as None; not None itself, which a selectbox shows as empty
 
@@ -65,7 +65,7 @@ def _render_extras(book: Book, report: export.Preflight) -> None:
 
 
 def _names(page_list: list[Page]) -> str:
-    return ", ".join(p.title.strip() or p.original_name for p in page_list)
+    return plain(", ".join(p.title.strip() or p.original_name for p in page_list))
 
 
 def _latest_export(book: Book) -> Path | None:

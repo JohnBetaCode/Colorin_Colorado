@@ -87,9 +87,14 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "settings.auth": {"es": "Autenticación", "en": "Authentication"},
     "settings.api_key": {"es": "API key", "en": "API key"},
+    "settings.api_key_saved": {
+        "es": "Guardada (termina en …{tail}); escribe otra para cambiarla",
+        "en": "Saved (ends in …{tail}); type another to change it",
+    },
+    "settings.api_key_forget": {"es": "Olvidar la API key guardada", "en": "Forget the saved API key"},
     "settings.api_key_help": {
-        "es": "Solo con autenticación por API key. Se guarda en `config/.env`, que no se sube a git.",
-        "en": "Only for API key authentication. Saved in `config/.env`, which is never committed.",
+        "es": "Solo con autenticación por API key. Se guarda en `config/.env`, que no se sube a git, y nunca se le muestra al navegador.",
+        "en": "Only for API key authentication. Saved in `config/.env`, which is never committed, and never sent to the browser.",
     },
     "auth.adc": {"es": "Google Cloud (gcloud, Vertex AI)", "en": "Google Cloud (gcloud, Vertex AI)"},
     "auth.vertex_key": {"es": "API key de Vertex AI", "en": "Vertex AI API key"},

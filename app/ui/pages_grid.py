@@ -11,7 +11,7 @@ from app.core import books, commons, imaging, pages
 from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import Book, Page
-from app.ui.common import flash, seed
+from app.ui.common import flash, plain, seed
 
 COLUMNS = 4
 THUMB_PX = 480
@@ -62,7 +62,7 @@ def _render_uploader(book: Book, expanded: bool) -> None:
                 st.error(t("wb.commons_failed", error=exc))
                 return
             st.session_state.upload_round = st.session_state.get("upload_round", 0) + 1
-            flash("success", t("pages.commons_added", name=page.original_name, license=t(f"license.{page.license}")))
+            flash("success", t("pages.commons_added", name=plain(page.original_name), license=t(f"license.{page.license}")))
             st.rerun()
 
 
@@ -84,7 +84,7 @@ def _render_card(book: Book, page: Page, index: int, total: int) -> None:
     with st.container(border=True):
         image = pages.selected_path(book.slug, page) or pages.original_path(book.slug, page)
         st.image(_square(image), width="stretch")
-        st.markdown(f"**{index + 1}. {page.title.strip() or page.original_name}**")
+        st.markdown(f"**{index + 1}. {plain(page.title.strip() or page.original_name)}**")
         badges = [t(f"status.{page.status}")]
         if page.id == book.cover_page_id:
             badges.append(t("pages.is_cover"))
@@ -123,7 +123,7 @@ def _render_delete_confirmation(book: Book, page_list: list[Page]) -> None:
     page = next((p for p in page_list if p.id == pending), None)
     if not page:
         return
-    st.warning(t("pages.confirm_delete", title=page.title.strip() or page.original_name))
+    st.warning(t("pages.confirm_delete", title=plain(page.title.strip() or page.original_name)))
     col_yes, col_no, _ = st.columns([1, 1, 4])
     if col_yes.button(t("home.yes_delete"), type="primary"):
         pages.delete_page(book.slug, page.id)
@@ -146,7 +146,7 @@ def _convert_all(book: Book, pending: list[Page], engine: str) -> None:
 
     failures = imaging.convert_pages(book, pending, engine, on_done)
     if failures:
-        names = ", ".join(p.title.strip() or p.original_name for p, _ in failures)
+        names = plain(", ".join(p.title.strip() or p.original_name for p, _ in failures))
         flash("warning", t("pages.converted_all_failed", done=len(pending) - len(failures), names=names, error=failures[0][1]))
     else:
         flash("success", t("pages.converted_all", n=len(pending)))

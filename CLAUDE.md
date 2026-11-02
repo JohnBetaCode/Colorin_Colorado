@@ -37,6 +37,9 @@ name a country or city (the author's own books can be about anything).
   "UI rules" in `docs/architecture.md` for why (lost clicks).
 - `books/`, `data/`, `spike/` and `config/.env` are user data and git-ignored. Never commit them and
   never put a real GCP project ID or API key in `config/.env.example`.
+- Security (see "Security" in `docs/architecture.md`): never seed a widget with a saved secret;
+  any new name that becomes part of a path needs a pattern in `schema.py` and a `books.inside`
+  check; user text goes through `ui.common.plain` in Markdown and `escape` in ReportLab.
 - When changing a model id (`GEMINI_*`), update `config/.env.example`, the defaults in
   `app/core/config.py`, `PRICING` in `app/core/usage.py`, and the table in `docs/setup.md`.
 - Amazon KDP numbers (sizes, page ranges, costs, royalties) live in `app/core/kdp.py`, with their
