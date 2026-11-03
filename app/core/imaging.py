@@ -264,8 +264,9 @@ def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = N
     """Convert a page's (cropped) photo and store the result as its new selected version.
 
     ``engine`` is ``"gemini"`` (AI, paid), ``"stable_diffusion"`` (AI on the author's own
-    server, slow), ``"draft"`` (offline, free) or ``"mosaic"`` (a mystery mosaic, offline, free). With ``replace``, that version is deleted once the new
-    one is stored: versions are never overwritten, so the replacement gets the next number.
+    server, slow), ``"draft"`` (offline, free) or ``"mosaic"`` (a mystery mosaic, offline, free).
+    With ``replace``, that version is deleted once the new one is stored: versions are never
+    overwritten, so the replacement gets the next number.
     Raises one of ``AI_ERRORS`` when the AI call fails; nothing is stored or deleted then.
     """
     stored = _store(book, render_page(book, page, engine))
