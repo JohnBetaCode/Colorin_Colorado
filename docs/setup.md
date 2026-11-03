@@ -13,6 +13,13 @@
 
 Without any of them the app still runs: the free draft engine converts photos offline.
 
+Optionally, a second engine for coloring pages: your own **Stable Diffusion** server
+([stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)'s `sd-server` with
+FLUX.1 Kontext), set in **⚙️ Settings → Stable Diffusion**. It draws pages only, slower (1–2
+minutes each, one at a time) and with no cost per image; captions, translations and covers still
+need Gemini. Check the model's license (FLUX.1 Kontext [dev] is non-commercial) and the server's
+rules before selling pages made with it.
+
 ## Run
 
 ```bash
@@ -56,7 +63,8 @@ still exports on `main`; converting it again there ignores that option.
 ## Configuration
 
 Settings live in `config/.env` (git-ignored). The **⚙️ Settings** panel on the home page edits
-them and can test the connection; **Save & test** sends one cheap text request.
+them and can test the connection: for Gemini, **Save & test** sends one cheap text request; for
+Stable Diffusion it reads the model's state without waking it up.
 
 | Variable | Default | What it is |
 |---|---|---|
@@ -67,6 +75,9 @@ them and can test the connection; **Save & test** sends one cheap text request.
 | `GEMINI_IMAGE_LOCATION` | `global` | Region of the image model (image models are usually served from `global`). |
 | `GEMINI_TEXT_MODEL` | `gemini-3.8-flash` | Text model (connection test; caption suggestions later). |
 | `GEMINI_IMAGE_MODEL` | `gemini-3-pro-image` | Image model that draws the coloring pages. |
+| `STABLE_DIFFUSION_URL` | — | Stable Diffusion server, e.g. `http://192.168.1.20:8081`. Empty: the engine is off. |
+| `STABLE_DIFFUSION_STEPS` | `12` | Sampling steps, 4–30. 8–12 looks almost like the server's default 20 in half the time. |
+| `STABLE_DIFFUSION_SIZE` | `768` | Long side of the photo sent to the server, 512–1024 px. 768 takes 1–1.5 minutes; 1024 nearly twice as long. |
 | `UI_LANGUAGE` | `es` | App language, `es` or `en`. Also switchable from the sidebar. |
 
 The saved API key is never sent to the browser: the Settings field stays empty, shows the key's last
@@ -84,7 +95,7 @@ when the file exists). Both `config/.env` and the override are git-ignored.
 | Path | Contents |
 |---|---|
 | `books/<slug>/` | Each book: `book.json`, `pages.json`, uploaded photos, every coloring-page version, cover images, PDF exports and KDP covers. |
-| `data/usage.jsonl` | One line per Gemini call with tokens and estimated cost. |
+| `data/usage.jsonl` | One line per Gemini call with tokens and estimated cost, and one per Stable Diffusion page (no cost). |
 
 Both are bind-mounted and git-ignored. Back up `books/` to keep your books.
 
@@ -112,6 +123,9 @@ read the PDF back and check that every coloring page is pure black and white.
 - **404 / model not found**: wrong model name or region; image models need `global`.
 - **"Image generation returned no image"**: usually the safety filter. The client retries once;
   try again, crop differently or add instructions.
+- **Stable Diffusion fails or times out**: the server must be reachable from the container (same
+  network or VPN). After 10 idle minutes it unloads the model, so the next page takes 10–30 s
+  more; when other people use it, pages wait in its queue. **Save & test** shows the model's state.
 - **A code change does not show up**: Streamlit reloads changed modules only while a browser tab
   is connected. If you edited files with no tab open, `docker compose restart app`.
 - **Changes to `requirements.txt` or the `Dockerfile`**: `docker compose up -d --build`.

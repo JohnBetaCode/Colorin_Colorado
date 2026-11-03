@@ -15,12 +15,16 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 
-from app.core import gemini, lineart, mosaic, pages, usage
+from app.core import gemini, lineart, mosaic, pages, stable_diffusion, usage
 from app.core.books import now
 from app.core.schema import Book, Engine, MosaicSettings, Page, Version
 
+# What a failed AI conversion raises, whichever engine drew it.
+AI_ERRORS = (gemini.GeminiError, stable_diffusion.StableDiffusionError)
+
 AI_PAGE_COST_USD = 0.14  # estimate shown before converting many pages at once
-BATCH_WORKERS = 3  # AI conversions running at the same time in convert_pages
+SD_PAGE_MINUTES = 1.5  # Stable Diffusion, one page at a time: estimate shown before converting many
+BATCH_WORKERS = 3  # Gemini conversions running at the same time in convert_pages
 
 STYLE_PROMPTS = {
     "realistic": (
@@ -128,6 +132,41 @@ STRICT COLORING-PAGE RULES:
 - The whole subject is visible, with a white margin around the drawing.
 """
 
+# Stable Diffusion (FLUX.1 Kontext) follows short, imperative English instructions and keeps the
+# photo as it is unless told otherwise; the long Gemini prompt above confuses it. Checked on real
+# photos in docs/spike.md ("Stable Diffusion").
+SD_STYLE_PROMPTS = {
+    "realistic": "",
+    "cartoon": " in a friendly children's cartoon style with simple rounded shapes",
+    "kawaii": " in a cute kawaii style: round chubby shapes, big eyes, a few small stars and hearts around",
+    "mandala": " and fill every large area inside the subject with decorative patterns of closed shapes",
+}
+
+SD_AGE_PROMPTS = {
+    "3-5": "a very simple coloring page for ages 3 to 5: very thick black outlines on white, big simple shapes",
+    "6-8": "a black and white coloring book page for children: clean bold black outlines on a pure white background",
+    "9+": "a detailed black and white coloring book page: clean black outlines on a pure white background",
+    "adult": "an intricate black and white coloring page for adults: fine black outlines on a pure white background",
+}
+
+SD_BACKGROUND_PROMPTS = {
+    "keep": "Keep the background, drawn as outlines.",
+    "simplify": "Draw the background with only a few simple lines.",
+    "remove": "Remove the background completely: the subject alone on plain white.",
+}
+
+
+def build_sd_prompt(style: str, age_group: str, background: str, instructions: str = "") -> str:
+    """The Stable Diffusion instruction for one page: what it is, what to keep, the background."""
+    prompt = (
+        f"Convert this photo into {SD_AGE_PROMPTS[age_group]}{SD_STYLE_PROMPTS[style]}. "
+        "No color, no shading, no gray, no solid black areas. "
+        "Keep the same subjects, their pose and proportions, and draw the eyes and faces clearly. "
+        f"{SD_BACKGROUND_PROMPTS[background]}"
+    )
+    return f"{prompt} {instructions.strip()}" if instructions.strip() else prompt
+
+
 # Aspect ratios the image model accepts, as width / height.
 _ASPECTS = {"3:4": 3 / 4, "1:1": 1.0, "4:3": 4 / 3}
 
@@ -179,7 +218,7 @@ def mosaic_draft(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
 
 
 def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
-    """Convert a page's (cropped) photo without storing anything. Raises ``gemini.GeminiError``."""
+    """Convert a page's (cropped) photo without storing anything. Raises one of ``AI_ERRORS``."""
     style = page.style or book.style
     background = page.background or book.background
     if engine == "mosaic":
@@ -195,6 +234,10 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
         prompt = build_prompt(style, book.age_group, background, page.title, page.instructions)
         with usage.book_context(book.id):
             raw = render_coloring_page(pages.jpeg_bytes(photo), photo.size, prompt)
+    elif engine == "stable_diffusion":
+        prompt = build_sd_prompt(style, book.age_group, background, page.instructions)
+        with usage.book_context(book.id):
+            raw = stable_diffusion.edit_image(photo, prompt)
     else:
         raw = lineart.to_png(lineart.draft(photo, style, book.age_group))
     cleaned = lineart.clean(raw, book.age_group)
@@ -220,10 +263,10 @@ def _store(book: Book, rendered: Rendered) -> Page:
 def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = None) -> Page:
     """Convert a page's (cropped) photo and store the result as its new selected version.
 
-    ``engine`` is ``"gemini"`` (AI, paid), ``"draft"`` (offline, free) or ``"mosaic"`` (a
-    mystery mosaic, offline, free). With ``replace``, that version is deleted once the new
+    ``engine`` is ``"gemini"`` (AI, paid), ``"stable_diffusion"`` (AI on the author's own
+    server, slow), ``"draft"`` (offline, free) or ``"mosaic"`` (a mystery mosaic, offline, free). With ``replace``, that version is deleted once the new
     one is stored: versions are never overwritten, so the replacement gets the next number.
-    Raises ``gemini.GeminiError`` when the AI call fails; nothing is stored or deleted then.
+    Raises one of ``AI_ERRORS`` when the AI call fails; nothing is stored or deleted then.
     """
     stored = _store(book, render_page(book, page, engine))
     if replace is not None:
@@ -234,7 +277,7 @@ def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = N
 def convert_pages(
     book: Book, page_list: list[Page], engine: Engine, on_done: Callable[[int, Page, str | None], None] | None = None
 ) -> list[tuple[Page, str]]:
-    """Convert several pages, ``BATCH_WORKERS`` AI calls at a time; returns the failures.
+    """Convert several pages, ``BATCH_WORKERS`` Gemini calls at a time; returns the failures.
 
     Every result is stored from the calling thread as soon as it arrives, so ``pages.json``
     is never written by two threads. ``on_done(count, page, error)`` reports each page.
@@ -249,7 +292,7 @@ def convert_pages(
             try:
                 _store(book, future.result())
                 error = None
-            except gemini.GeminiError as exc:
+            except AI_ERRORS as exc:
                 error = str(exc)
                 failures.append((page, error))
             if on_done:

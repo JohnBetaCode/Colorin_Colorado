@@ -16,7 +16,9 @@ from typing import Literal
 from PIL import Image
 
 from app.core import cover_art, export
-from app.core.schema import LICENSES_NOT_FOR_SALE, LICENSES_WITH_CREDIT, Book, Ink, Marketplace, Page, PageSize
+from app.core.schema import (
+    AI_ENGINES, LICENSES_NOT_FOR_SALE, LICENSES_WITH_CREDIT, Book, Ink, Marketplace, Page, PageSize
+)
 
 TRIM: dict[PageSize, tuple[float, float]] = {  # inches; all of them are "large" trims for printing cost
     "letter": (8.5, 11.0),
@@ -148,7 +150,7 @@ def _names(page_list: list[Page]) -> str:
 
 
 def _uses_ai(page: Page) -> bool:
-    return any(v.n == page.selected and v.engine == "gemini" for v in page.versions)
+    return any(v.n == page.selected and v.engine in AI_ENGINES for v in page.versions)
 
 
 def review(book: Book) -> Review:

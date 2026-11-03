@@ -40,8 +40,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Turn your photos into a coloring book.",
     },
     "home.unconfigured": {
-        "es": "Gemini aún no está configurado: abre **⚙️ Ajustes** para usar la IA. Mientras tanto puedes usar el borrador gratis.",
-        "en": "Gemini is not configured yet: open **⚙️ Settings** to use the AI. Meanwhile you can use the free draft.",
+        "es": "Ningún motor de IA está configurado: abre **⚙️ Ajustes** para usar Gemini o Stable Diffusion. Mientras tanto puedes usar el borrador gratis.",
+        "en": "No AI engine is configured yet: open **⚙️ Settings** to use Gemini or Stable Diffusion. Meanwhile you can use the free draft.",
     },
     "home.new_book": {"es": "Nuevo libro", "en": "New book"},
     "home.title_placeholder": {"es": "p. ej. Aves del jardín", "en": "e.g. Garden birds"},
@@ -80,7 +80,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "home.yes_delete": {"es": "Sí, borrarlo", "en": "Yes, delete it"},
     "home.cancel": {"es": "Cancelar", "en": "Cancel"},
     # Settings
-    "settings.title": {"es": "⚙️ Ajustes: Gemini", "en": "⚙️ Settings: Gemini"},
+    "settings.title": {"es": "⚙️ Ajustes: motores de IA", "en": "⚙️ Settings: AI engines"},
+    "settings.tab_gemini": {"es": "Gemini", "en": "Gemini"},
+    "settings.tab_sd": {"es": "Stable Diffusion", "en": "Stable Diffusion"},
+    "settings.sd_help": {
+        "es": "Segundo motor opcional: un servidor propio de stable-diffusion.cpp (`sd-server`) con FLUX.1 Kontext. Solo dibuja páginas para colorear, más lento que Gemini (1–2 minutos cada una) y sin coste por imagen; los textos, traducciones y portadas siguen con Gemini. Revisa la licencia del modelo y las normas del servidor antes de vender páginas hechas con él. Déjalo vacío para no usarlo.",
+        "en": "Optional second engine: your own stable-diffusion.cpp server (`sd-server`) with FLUX.1 Kontext. It only draws coloring pages, slower than Gemini (1–2 minutes each) and with no cost per image; texts, translations and covers stay on Gemini. Check the model's license and the server's rules before selling pages made with it. Leave it empty to turn it off.",
+    },
+    "settings.sd_url": {"es": "Dirección del servidor", "en": "Server address"},
+    "settings.sd_steps": {"es": "Pasos", "en": "Steps"},
+    "settings.sd_steps_help": {
+        "es": "Más pasos, más lento. 8–12 se ve casi igual que 20 y tarda la mitad.",
+        "en": "More steps is slower. 8–12 looks almost the same as 20 in half the time.",
+    },
+    "settings.sd_size": {"es": "Tamaño (lado largo, px)", "en": "Size (long side, px)"},
+    "settings.sd_size_help": {
+        "es": "La foto se envía a este tamaño. 768 tarda 1–1,5 minutos; 1024 casi el doble. La limpieza la lleva luego a tamaño de impresión.",
+        "en": "The photo is sent at this size. 768 takes 1–1.5 minutes; 1024 nearly twice as long. The cleanup then scales it to print size.",
+    },
+    "settings.sd_testing": {"es": "Probando la conexión con Stable Diffusion…", "en": "Testing the connection to Stable Diffusion…"},
+    "settings.sd_ok": {"es": "Conexión correcta: el modelo está «{state}».", "en": "Connection OK: the model is “{state}”."},
     "settings.help": {
         "es": "Conéctate con Google Cloud (`gcloud auth application-default login` y el ID del proyecto) o con una API key. Estos valores se guardan en `config/.env`.",
         "en": "Connect with Google Cloud (`gcloud auth application-default login` and the project ID) or with an API key. These values are saved to `config/.env`.",
@@ -193,7 +212,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "status.pending": {"es": "⏳ Pendiente", "en": "⏳ Pending"},
     "status.converted": {"es": "🖍️ Convertida", "en": "🖍️ Converted"},
     "status.approved": {"es": "✅ Aprobada", "en": "✅ Approved"},
-    "engine.gemini": {"es": "IA", "en": "AI"},
+    "engine.gemini": {"es": "Gemini", "en": "Gemini"},
+    "engine.stable_diffusion": {"es": "Stable Diffusion", "en": "Stable Diffusion"},
     "engine.draft": {"es": "Borrador", "en": "Draft"},
     "engine.mosaic": {"es": "Monocromo", "en": "Monochrome"},
     "page_size.letter": {"es": "Carta (Letter)", "en": "Letter"},
@@ -292,8 +312,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.crop_reset": {"es": "✂️ Quitar recorte", "en": "✂️ Remove crop"},
     "wb.coloring_page": {"es": "Página para colorear", "en": "Coloring page"},
     "wb.not_converted": {
-        "es": "Aún no se ha convertido. Elige el estilo y pulsa **Convertir con IA**, o prueba el borrador gratis.",
-        "en": "Not converted yet. Pick the style and press **Convert with AI**, or try the free draft.",
+        "es": "Aún no se ha convertido. Elige el estilo y pulsa **✨ Gemini** o **🖌️ Stable Diffusion**, o prueba el borrador gratis.",
+        "en": "Not converted yet. Pick the style and press **✨ Gemini** or **🖌️ Stable Diffusion**, or try the free draft.",
     },
     "wb.versions": {"es": "Versiones", "en": "Versions"},
     "wb.version_label": {"es": "v{n} · {engine} · {style}", "en": "v{n} · {engine} · {style}"},
@@ -302,8 +322,21 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.book_default": {"es": "Como el libro ({value})", "en": "Book default ({value})"},
     "wb.instructions": {"es": "Instrucciones extra", "en": "Extra instructions"},
     "wb.instructions_placeholder": {"es": "p. ej. solo el ave, sin la rama", "en": "e.g. only the bird, not the branch"},
-    "wb.convert": {"es": "✨ Convertir con IA", "en": "✨ Convert with AI"},
-    "wb.regenerate": {"es": "✨ Regenerar con IA", "en": "✨ Regenerate with AI"},
+    "wb.convert": {"es": "✨ Gemini", "en": "✨ Gemini"},
+    "wb.regenerate": {"es": "✨ Otra con Gemini", "en": "✨ Again with Gemini"},
+    "wb.sd": {"es": "🖌️ Stable Diffusion", "en": "🖌️ Stable Diffusion"},
+    "wb.sd_help": {
+        "es": "Dibuja la página con tu servidor de Stable Diffusion: 1–2 minutos, sin coste por imagen. Va mejor con un solo sujeto que con escenas llenas. No cambies de página mientras dibuja.",
+        "en": "Draws the page on your Stable Diffusion server: 1–2 minutes, no cost per image. Works better with one subject than with crowded scenes. Do not change pages while it draws.",
+    },
+    "wb.sd_disabled": {
+        "es": "Configura Stable Diffusion en la página de inicio para usarlo.",
+        "en": "Configure Stable Diffusion on the home page to use it.",
+    },
+    "wb.sd_converting": {
+        "es": "Dibujando con Stable Diffusion… (1–2 minutos; no toques nada mientras tanto)",
+        "en": "Drawing with Stable Diffusion… (1–2 minutes; do not touch anything meanwhile)",
+    },
     "wb.draft": {"es": "✏️ Borrador gratis", "en": "✏️ Free draft"},
     "wb.draft_help": {
         "es": "Conversión local sin IA: instantánea y gratis. Dibuja las zonas de color de la foto, no un dibujo de verdad; sirve para armar el libro antes de gastar.",
@@ -459,7 +492,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "es": "**{n} páginas** del libro aún no tienen dibujo.",
         "en": "**{n} pages** in the book have no drawing yet.",
     },
-    "pages.convert_all_ai": {"es": "✨ Convertir todas con IA (≈ ${cost:.2f})", "en": "✨ Convert all with AI (≈ ${cost:.2f})"},
+    "pages.convert_all_ai": {"es": "✨ Todas con Gemini (≈ ${cost:.2f})", "en": "✨ All with Gemini (≈ ${cost:.2f})"},
+    "pages.convert_all_sd": {"es": "🖌️ Todas con Stable Diffusion (≈ {minutes} min)", "en": "🖌️ All with Stable Diffusion (≈ {minutes} min)"},
+    "pages.convert_all_sd_help": {
+        "es": "Una a la vez en tu servidor, 1–2 minutos por página. Deja la pestaña abierta y no toques nada hasta que termine.",
+        "en": "One at a time on your server, 1–2 minutes per page. Keep the tab open and do not touch anything until it finishes.",
+    },
     "pages.convert_all_ai_help": {
         "es": "Tres a la vez; unos 15 segundos por página. Revisa y aprueba cada una después en la mesa de trabajo.",
         "en": "Three at a time; about 15 seconds per page. Check and approve each one in the workbench afterwards.",

@@ -159,19 +159,26 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
         return
     with st.container(border=True):
         st.markdown(t("pages.convert_all_title", n=len(pending)))
-        configured = get_settings().configured
-        col1, col2, col3 = st.columns(3)
+        settings = get_settings()
+        col1, col2, col3, col4 = st.columns(4)
         if col1.button(
             t("pages.convert_all_ai", cost=len(pending) * imaging.AI_PAGE_COST_USD),
             type="primary",
-            disabled=not configured,
-            help=t("pages.convert_all_ai_help") if configured else t("wb.ai_disabled"),
+            disabled=not settings.configured,
+            help=t("pages.convert_all_ai_help") if settings.configured else t("wb.ai_disabled"),
             width="stretch",
         ):
             _convert_all(book, pending, "gemini")
-        if col2.button(t("pages.convert_all_draft"), help=t("wb.draft_help"), width="stretch"):
+        if col2.button(
+            t("pages.convert_all_sd", minutes=round(len(pending) * imaging.SD_PAGE_MINUTES)),
+            disabled=not settings.sd_configured,
+            help=t("pages.convert_all_sd_help") if settings.sd_configured else t("wb.sd_disabled"),
+            width="stretch",
+        ):
+            _convert_all(book, pending, "stable_diffusion")
+        if col3.button(t("pages.convert_all_draft"), help=t("wb.draft_help"), width="stretch"):
             _convert_all(book, pending, "draft")
-        if col3.button(t("pages.convert_all_mosaic"), help=t("wb.mosaic_help"), width="stretch"):
+        if col4.button(t("pages.convert_all_mosaic"), help=t("wb.mosaic_help"), width="stretch"):
             _convert_all(book, pending, "mosaic")
 
 
