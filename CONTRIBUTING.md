@@ -64,6 +64,12 @@ and take a few seconds. Add a test with every change in `app/core/`.
 5. If you ran paid Gemini calls to test, say roughly how much, and add a row to
    `docs/development-cost.md`.
 
+## Security
+
+Found a vulnerability? Please report it privately through GitHub (**Security → Report a
+vulnerability**) instead of opening a public issue. The measures already in place are listed under
+"Security" in [docs/architecture.md](docs/architecture.md).
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).

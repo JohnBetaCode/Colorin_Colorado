@@ -36,6 +36,9 @@ are dropped, solid black areas become outlines, lines are thickened for small ha
 "photo of a printed page" is cut down to the drawing. See the [spike](docs/spike.md) for what
 the model gets wrong and how each case is handled.
 
+The pages are drawn by Gemini, or, if you have one, by your own **Stable Diffusion** server
+(FLUX.1 Kontext): slower and with no cost per image. Both go through the same cleanup.
+
 Without the AI, a photo can also become a **mystery mosaic**: a faint grid with a number in every
 cell and a legend that says how to fill each one. Color it in and the picture appears; the
 solutions are at the end of the book.

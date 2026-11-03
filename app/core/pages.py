@@ -16,7 +16,7 @@ from PIL import Image
 from pillow_heif import register_heif_opener
 
 from app.core import grouping, lineart, tones
-from app.core.books import book_path
+from app.core.books import book_path, inside
 from app.core.schema import Crop, Page, SubjectPoint, Version
 
 register_heif_opener()
@@ -59,11 +59,12 @@ def update_page(slug: str, page_id: str, **fields) -> Page:
 
 
 def original_path(slug: str, page: Page) -> Path:
-    return book_path(slug) / "originals" / page.original
+    return inside(book_path(slug), book_path(slug) / "originals" / page.original)
 
 
 def version_path(slug: str, page_id: str, n: int, raw: bool = False) -> Path:
-    return book_path(slug) / "lineart" / page_id / (f"v{n}-raw.png" if raw else f"v{n}.png")
+    path = book_path(slug) / "lineart" / page_id / (f"v{n}-raw.png" if raw else f"v{n}.png")
+    return inside(book_path(slug) / "lineart", path)
 
 
 def selected_path(slug: str, page: Page) -> Path | None:
@@ -137,7 +138,7 @@ def add_version(slug: str, page_id: str, version: Version, raw: bytes, clean: Im
     page = next(p for p in pages if p.id == page_id)
     version.n = max([page.last_version, *(v.n for v in page.versions)]) + 1
     page.last_version = version.n
-    folder = book_path(slug) / "lineart" / page_id
+    folder = inside(book_path(slug) / "lineart", book_path(slug) / "lineart" / page_id)
     folder.mkdir(parents=True, exist_ok=True)
     version_path(slug, page_id, version.n, raw=True).write_bytes(raw)
     clean.save(version_path(slug, page_id, version.n))
@@ -216,7 +217,7 @@ def delete_page(slug: str, page_id: str) -> None:
     pages = load_pages(slug)
     page = next(p for p in pages if p.id == page_id)
     original_path(slug, page).unlink(missing_ok=True)
-    folder = book_path(slug) / "lineart" / page_id
+    folder = inside(book_path(slug) / "lineart", book_path(slug) / "lineart" / page_id)
     for file in folder.glob("*") if folder.exists() else []:
         file.unlink()
     if folder.exists():

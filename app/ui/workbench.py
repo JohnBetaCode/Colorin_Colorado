@@ -360,11 +360,14 @@ def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
 
 
 def _convert(book: Book, page: Page, engine: Engine, replace: int | None = None) -> None:
-    spinner = {"gemini": "wb.converting", "draft": "wb.drafting", "mosaic": "wb.mosaic_drawing"}[engine]
+    spinner = {
+        "gemini": "wb.converting", "stable_diffusion": "wb.sd_converting", "draft": "wb.drafting",
+        "mosaic": "wb.mosaic_drawing",
+    }[engine]
     with st.spinner(t(spinner)):
         try:
             updated = imaging.convert_page(book, page, engine, replace=replace)
-        except (gemini.GeminiError, background.BackgroundError) as exc:
+        except imaging.CONVERT_ERRORS as exc:
             st.error(t("wb.failed", error=exc))
             return
     st.session_state.pop(f"version_{page.id}", None)
@@ -631,20 +634,29 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
 
     _render_mosaic_options(book, page)
 
-    configured = get_settings().configured
-    col1, col2, col3 = st.columns(3)
+    settings = get_settings()
+    col1, col2 = st.columns(2)  # AI engines, then the free ones without AI
     if col1.button(
         t("wb.regenerate") if page.versions else t("wb.convert"),
         type="primary",
         width="stretch",
-        disabled=not configured,
-        help=None if configured else t("wb.ai_disabled"),
+        disabled=not settings.configured,
+        help=None if settings.configured else t("wb.ai_disabled"),
         key=f"convert_{page.id}",
     ):
         _convert(book, page, "gemini")
-    if col2.button(t("wb.draft"), width="stretch", help=t("wb.draft_help"), key=f"draft_{page.id}"):
+    if col2.button(
+        t("wb.sd"),
+        width="stretch",
+        disabled=not settings.sd_configured,
+        help=t("wb.sd_help") if settings.sd_configured else t("wb.sd_disabled"),
+        key=f"sd_{page.id}",
+    ):
+        _convert(book, page, "stable_diffusion")
+    col3, col4 = st.columns(2)
+    if col3.button(t("wb.draft"), width="stretch", help=t("wb.draft_help"), key=f"draft_{page.id}"):
         _convert(book, page, "draft")
-    if col3.button(t("wb.mosaic"), width="stretch", help=t("wb.mosaic_help"), key=f"mosaic_{page.id}"):
+    if col4.button(t("wb.mosaic"), width="stretch", help=t("wb.mosaic_help"), key=f"mosaic_{page.id}"):
         _convert(book, page, "mosaic")
 
     col1, col2 = st.columns(2)

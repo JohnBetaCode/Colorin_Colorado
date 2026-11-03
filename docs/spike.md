@@ -66,6 +66,40 @@ fine lines. About $0.42.
 
 ![Kawaii, mandala and realistic for adults](images/more-styles.jpg)
 
+## Stable Diffusion (2026-11-02)
+
+A second, optional engine for coloring pages (`stable_diffusion.py`): a stable-diffusion.cpp
+server (`sd-server`) running FLUX.1 Kontext [dev], reached through its OpenAI-style
+`/v1/images/edits`. Checked on three of the photos above (toucan, laughing boy, girl with
+pigeons), sent at 768 px on the long side with 12 sampling steps, and compared with Gemini's
+pages in `docs/images`. Twelve conversions in all, one at a time: **70–90 s each**, no cost per
+image.
+
+**Kontext wants a short instruction.** Its guide recommends short, imperative English; the long
+Gemini prompt is not used. A first round tried three wordings on the toucan and two on the boy
+and the pigeons: a plain "convert this photo into a black and white coloring book page", one
+for ages 6–8 asking to simplify the background, and a cartoon one for ages 3–5. The prompt in
+`imaging.build_sd_prompt` is the plain one plus the age, the style, "draw the eyes and faces
+clearly" (the boy came out almost without eyes) and the background. The second round used it:
+
+![Toucan realistic and kawaii 6–8, boy realistic 6–8 and cartoon 3–5, pigeons 3–5](images/stable-diffusion.jpg)
+
+What it does:
+
+- **Every page was clean**: all 12 passed `lineart.clean` with no warnings, no copied colors,
+  no black fills, no paper mockups. It returns the photo's size, so the cleanup upscales from
+  768 px; at print size the lines are a little softer than Gemini's.
+- **Simple subjects and ages 3–5 are its strength**: the boy as a cartoon for 3–5 is as good as
+  Gemini's, and with the eyes line the realistic one keeps his laughing face.
+- **It keeps the photo.** It hardly ever simplifies or invents: "simplify the background" was
+  ignored every time (the toucan keeps every branch), it draws less inner detail than Gemini
+  (no feathers), and kawaii only adds a couple of stars. The crop and SAM2 (on the `SAM` branch)
+  are the ways to change the framing.
+- **Crowded scenes get muddled**: the pigeons become a tangle of overlapping outlines, even for
+  3–5, where Gemini draws each bird. Use Gemini for those.
+
+Not checked yet: `remove` background, mandala, adults, and sizes other than 768 px.
+
 ## Still open
 
 - **Small subjects.** When the subject fills a small part of the photo (the dogs), the model keeps

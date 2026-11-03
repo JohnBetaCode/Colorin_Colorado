@@ -1,14 +1,15 @@
-streamlit==1.49.1
+streamlit==1.66.1
 google-genai==2.22.0
 pydantic==2.13.5
-python-dotenv==1.1.1
+python-dotenv==1.2.4
 reportlab==5.0.1
-streamlit-pdf==1.0.8          # inline viewer for st.pdf (2.x needs a newer Streamlit)
-pillow==11.3.0
-pillow-heif==1.1.1            # HEIC/HEIF uploads (iPhone photos)
+streamlit-pdf==2.1.0          # inline viewer for st.pdf
+pillow==13.0.0
+pillow-heif==1.8.1            # HEIC/HEIF uploads (iPhone photos)
 opencv-python-headless==4.12.0.88
 numpy==2.2.6                  # opencv-python-headless 4.12 needs numpy<2.3
 pypdfium2==4.30.0             # renders the PDFs into the listing images
+requests==2.34.2              # the Stable Diffusion server (stable_diffusion.py)
 
 # Background removal for mosaics (SAM2, background.py). CPU-only torch: much smaller than the
 # default CUDA build, and SAM2 runs on the CPU in a few seconds per photo.
@@ -18,5 +19,5 @@ torchvision==0.29.1           # needed by transformers' SAM2 image processor
 transformers==5.21.1
 
 # Tests
-pytest==8.4.2
-pypdf==6.1.1                  # reads images back out of exported PDFs
+pytest==9.2.0
+pypdf==6.21.4                 # reads images back out of exported PDFs

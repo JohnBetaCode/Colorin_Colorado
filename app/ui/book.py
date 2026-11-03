@@ -9,7 +9,7 @@ from app.core.config import LANGUAGES
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, BACKGROUNDS, STYLES, TEMPLATES, Book
 from app.ui import export_panel, kdp_panel, pages_grid, workbench
-from app.ui.common import flash, language_switch, seed, show_flash
+from app.ui.common import flash, language_switch, plain, seed, show_flash
 
 VIEWS = ("workbench", "pages", "export", "kdp")
 NO_SECOND_LANGUAGE = "none"  # stored as None; not None itself, which a selectbox shows as empty
@@ -23,7 +23,7 @@ def _close_book() -> None:
 
 def _render_sidebar(book: Book) -> None:
     with st.sidebar:
-        st.markdown(f"### {book.title}")
+        st.markdown(f"### {plain(book.title)}")
         st.caption(
             f"{t(f'style.{book.style}')} · {t(f'age.{book.age_group}')} · {LANGUAGE_NAMES[book.language]}"
         )
@@ -93,9 +93,9 @@ def render_book(book: Book) -> None:
     _render_sidebar(book)
     show_flash()
 
-    st.title(f"🖍️ {book.title}")
+    st.title(f"🖍️ {plain(book.title)}")
     if book.subtitle:
-        st.caption(book.subtitle)
+        st.caption(plain(book.subtitle))
 
     page_list = pages.load_pages(book.slug)
     st.session_state.setdefault("view", "workbench" if page_list else "pages")

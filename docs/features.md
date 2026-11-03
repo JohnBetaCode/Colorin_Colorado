@@ -39,6 +39,8 @@ part.
 - **Spanish and English**, for the app and for each book.
 - **Duplicate a book, or move it as a ZIP** to back it up or open it on another computer.
 - **Your choice of access to Gemini**: a Google Cloud project, or just an API key.
+- **A second engine, Stable Diffusion**: your own stable-diffusion.cpp server with FLUX.1 Kontext
+  draws the coloring pages for no cost per image, one at a time, set up in the same Settings panel.
 - **Costs in sight.** About $0.14 per AI conversion; the tokens and cost of every call are
   tracked per book and in total.
 

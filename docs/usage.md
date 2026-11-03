@@ -9,13 +9,18 @@
 2. **Add photos** in **🗂️ Pages → 📷 Add photos**. Select many at once; each becomes a page in the
    order you uploaded them. Or paste a **Wikimedia Commons** link: the photo comes with its
    author, license and link already filled in.
-3. **Convert**. In **🗂️ Pages**, **✨ Convert all with AI** draws every page that has no drawing
-   yet, three at a time, with the estimated cost on the button (**✏️ Free draft of all** does it
-   for free). Or go page by page in the **🎨 Workbench**:
+3. **Convert**. In **🗂️ Pages**, **✨ All with Gemini** draws every page that has no drawing
+   yet, three at a time, with the estimated cost on the button; **🖌️ All with Stable Diffusion**
+   does it on your own server, one at a time, with the estimated minutes (**✏️ Free draft of all**
+   does it for free). Or go page by page in the **🎨 Workbench**:
    - **Crop** the photo first if the subject is small in it. The model keeps the photo's framing,
      so a dog in a corner of a lawn becomes a page full of grass.
-   - **✨ Convert with AI** takes 30–40 seconds and costs about $0.14. **✏️ Free draft** is instant
-     and free, but it only traces the photo's color areas: use it to lay out a book, not to print.
+   - **✨ Gemini** takes 30–40 seconds and costs about $0.14. **🖌️ Stable Diffusion** (when set
+     up) takes 1–2 minutes on your own server and costs nothing per image; it does well with one
+     subject and simple pages for small children, less so with crowded scenes, and it tends to
+     keep the photo's background. Do not touch the app while it draws. **✏️ Free draft** is
+     instant and free, but it only traces the photo's color areas: use it to lay out a book, not
+     to print.
    - Not happy? Add **extra instructions** ("only the bird, not the branch", "remove the people in
      the back"), change the page's **style** or **background**, and regenerate. Every attempt is
      kept under **Versions**; pick the one you like.

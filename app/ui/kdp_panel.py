@@ -13,7 +13,7 @@ from app.core import books, captions, cover, cover_art, export, gemini, kdp, mar
 from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import ART_MODES, COVER_COLORS, INKS, MARKETPLACES, Book, Listing, Page
-from app.ui.common import flash, seed
+from app.ui.common import flash, plain, seed
 
 # Front image option meaning "no cover image": the cover page's line art (stored as None).
 LINE_ART = "line"
@@ -178,7 +178,8 @@ def _render_checks(book: Book, review: kdp.Review) -> None:
     if review.ready:
         st.success(t("kdp.ready"))
     for issue in review.issues:
-        getattr(st, issue.level)(t(f"kdp.issue.{issue.key}", **issue.params))
+        params = {k: plain(v) if isinstance(v, str) else v for k, v in issue.params.items()}
+        getattr(st, issue.level)(t(f"kdp.issue.{issue.key}", **params))
     st.markdown(f"#### {t('kdp.upload')}")
     st.markdown(
         t("kdp.upload_steps", trim=t(f"kdp.trim.{book.page_size}"), ink=t(f"ink.{book.kdp_ink}"), pages=review.pages)

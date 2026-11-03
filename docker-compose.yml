@@ -5,7 +5,9 @@ services:
     # Run as the host user so books/ and data/ stay owned by you, not root.
     user: "${UID:-1000}:${GID:-1000}"
     ports:
-      - "8502:8502"
+      # Only this computer can open the app. To use it from other devices on your network, start
+      # it with COLORIN_BIND=0.0.0.0 (anyone on that network can then use it and your Gemini key).
+      - "${COLORIN_BIND:-127.0.0.1}:8502:8502"
     volumes:
       # Live-reload the code while developing
       - ./app:/workspace/app

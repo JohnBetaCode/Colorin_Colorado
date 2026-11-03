@@ -10,6 +10,10 @@ Authentication (``GEMINI_AUTH``) is one of:
     and ``GOOGLE_CLOUD_PROJECT``.
   - ``vertex_key``: Vertex AI with an API key (``GEMINI_API_KEY``), no project needed.
   - ``studio_key``: the Gemini Developer API with a Google AI Studio key (``GEMINI_API_KEY``).
+
+Stable Diffusion (``STABLE_DIFFUSION_URL``) is the second, optional image engine: a
+stable-diffusion.cpp server on the author's own network. It only draws coloring pages;
+texts and covers stay on Gemini.
 """
 
 from __future__ import annotations
@@ -26,6 +30,8 @@ ENV_FILE = CONFIG_DIR / ".env"
 
 LANGUAGES = ("es", "en")
 AUTH_METHODS = ("adc", "vertex_key", "studio_key")
+SD_STEPS_RANGE = (4, 30)  # sampling steps: 8-12 is about as good as the server's 20, twice as fast
+SD_SIZE_RANGE = (512, 1024)  # long side sent to the server, in pixels; time grows with the area
 
 load_dotenv(ENV_FILE)
 
@@ -40,10 +46,25 @@ class Settings:
     text_model: str
     image_model: str
     ui_language: str
+    sd_url: str = ""
+    sd_steps: int = 12
+    sd_size: int = 768
 
     @property
     def configured(self) -> bool:
         return bool(self.project) if self.auth == "adc" else bool(self.api_key)
+
+    @property
+    def sd_configured(self) -> bool:
+        return bool(self.sd_url)
+
+
+def _int(name: str, default: int, bounds: tuple[int, int]) -> int:
+    try:
+        value = int(os.environ.get(name, default))
+    except ValueError:
+        value = default
+    return max(bounds[0], min(bounds[1], value))
 
 
 def get_settings() -> Settings:
@@ -58,6 +79,9 @@ def get_settings() -> Settings:
         text_model=os.environ.get("GEMINI_TEXT_MODEL", "gemini-3.8-flash"),
         image_model=os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3-pro-image"),
         ui_language=language if language in LANGUAGES else "es",
+        sd_url=os.environ.get("STABLE_DIFFUSION_URL", "").strip().rstrip("/"),
+        sd_steps=_int("STABLE_DIFFUSION_STEPS", 12, SD_STEPS_RANGE),
+        sd_size=_int("STABLE_DIFFUSION_SIZE", 768, SD_SIZE_RANGE),
     )
 
 

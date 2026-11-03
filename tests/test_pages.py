@@ -206,3 +206,43 @@ def test_new_styles_and_the_adult_level_have_prompts_and_cleanup():
     assert "patterns" in prompt and "INTRICATE" in prompt and "1/300" in prompt
     assert "kawaii" in imaging.build_prompt("kawaii", "3-5", "remove")
     assert lineart.MIN_STROKE_PX["adult"] < lineart.MIN_STROKE_PX["9+"]
+
+
+def _zip(book: dict, page_list: list[dict]) -> bytes:
+    import json
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("book.json", json.dumps(book))
+        archive.writestr("pages.json", json.dumps(page_list))
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"id": "../../../victim_dir", "original": "ok.jpg", "original_name": "a.jpg"},
+        {"id": "ok", "original": "../../../victim.txt", "original_name": "a.jpg"},
+        {"id": "ok", "original": "/etc/passwd", "original_name": "a.jpg"},
+    ],
+)
+def test_a_crafted_zip_cannot_reach_files_outside_its_book(tmp_path, page):
+    victim = books.BOOKS_DIR.parent / "victim.txt"
+    victim.write_text("important")
+    book = {"id": "x", "slug": "x", "title": "Evil", "created_at": "now", "updated_at": "now"}
+    with pytest.raises(ValueError):
+        books.import_zip(_zip(book, [page]))
+    assert victim.exists() and [b.title for b in books.list_books()] == []
+
+
+def test_paths_stay_inside_the_book_even_without_validation(photo):
+    from app.core.schema import Page
+
+    book = books.create_book("Aves del jardín")
+    sneaky = Page.model_construct(id="../../x", original="../../../victim.txt", original_name="a.jpg")
+    with pytest.raises(ValueError):
+        pages.original_path(book.slug, sneaky)
+    with pytest.raises(ValueError):
+        pages.version_path(book.slug, "../../x", 1)
+    with pytest.raises(ValueError):
+        books.book_path("../outside")

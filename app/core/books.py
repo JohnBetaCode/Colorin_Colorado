@@ -47,8 +47,18 @@ def slugify(name: str) -> str:
     return slug or "book"
 
 
+def inside(root: Path, path: Path) -> Path:
+    """``path``, if it stays inside ``root``; raises ``ValueError`` otherwise."""
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError(f"{path} is outside {root}.")
+    return path
+
+
 def book_path(slug: str) -> Path:
-    return BOOKS_DIR / slug
+    path = BOOKS_DIR / slug
+    if not slug or path.resolve().parent != BOOKS_DIR.resolve():
+        raise ValueError(f"Not a book folder name: {slug!r}.")
+    return path
 
 
 def list_books() -> list[Book]:

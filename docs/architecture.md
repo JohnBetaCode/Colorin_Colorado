@@ -17,6 +17,7 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
   pages_grid.py     │
   export_panel.py   ├──► app/core/imaging.py ──┬──► app/core/gemini.py ──► Gemini (Vertex AI or AI Studio)
   kdp_panel.py      │                          │         └──► app/core/usage.py (data/usage.jsonl)
+                    │                          ├──► app/core/stable_diffusion.py ──► your sd-server (optional)
                     │                          └──► app/core/lineart.py (clean, draft)
                     ├──► app/core/captions.py  (translations, Amazon listing) ──► gemini.py
                     ├──► app/core/cover_art.py (front cover images) ──► gemini.py
@@ -34,11 +35,12 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 |---|---|
 | `core/config.py` | Loads `config/.env`; `Settings` (including the auth method: `adc`, `vertex_key` or `studio_key`); `save_settings` merges new values into `.env` (keys not passed are kept). |
 | `core/gemini.py` | One cached `genai.Client` per location, created under a lock (concurrent first calls used to build throwaway clients that closed their connection when garbage-collected): Vertex AI with ADC and a project, Vertex AI with an API key, or the Gemini Developer API with an AI Studio key. `generate_image` takes reference images (JPEG/PNG/WebP sniffed), aspect ratio and size, returns the final image (not the low-resolution drafts the model thinks with, which come first, marked `thought`), and retries once when no image comes back. Every call records usage. |
+| `core/stable_diffusion.py` | The optional second image engine: a stable-diffusion.cpp server (`sd-server`, FLUX.1 Kontext) at `STABLE_DIFFUSION_URL`. `edit_image` shrinks the photo to `STABLE_DIFFUSION_SIZE` on its long side (multiples of 8), passes the steps inside the prompt (`<sd_cpp_extra_args>`), posts it to `/v1/images/edits` one call at a time (the server draws one image at a time), retries busy or restarting servers with backoff (15 min timeout) and records one image at no cost. `check_connection` reads `/sdcpp/v1/models/status`, which does not wake the model (`/v1/models` does). Only coloring pages use it: captions, translations and covers stay on Gemini. |
 | `core/usage.py` | One JSON line per call with input, output and thinking tokens and the estimated cost (`PRICING`; thinking tokens of image models at the text rate); `book_context(book_id)` attributes calls to a book; `summarize` and `breakdown` feed the usage panel and the sidebar. |
 | `core/schema.py` | Pydantic models `Book`, `Page`, `Version`, `Crop`, `CoverArt` and the option tuples (`STYLES`, `AGE_GROUPS`...). |
 | `core/books.py` | Book folders under `books/`, `book.json`, slugs (accents folded), create/list/delete, `duplicate_book`, and `export_zip`/`import_zip` (a book as a ZIP without its exports; imports become new books, and entries outside the book layout are ignored). |
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
-| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three AI calls at a time, stored from the calling thread). |
+| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; Stable Diffusion's short English prompt (`SD_STYLE_PROMPTS`, `SD_AGE_PROMPTS`, `SD_BACKGROUND_PROMPTS`, `build_sd_prompt`); `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three Gemini calls at a time or one at a time for the other engines, stored from the calling thread). `AI_ERRORS` is what a failed AI conversion raises, whichever engine. |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
 | `core/grouping.py` | Color grouping after the tone curve: mean shift (`pyrMeanShiftFiltering`) with one setting, the bandwidth (color radius); at most 1200 px, cached by what the photo was made from. |
 | `core/tones.py` | Tone curves for a page's photo, like GIMP's Curves: `lut` (control points joined by a monotone cubic, flat beyond the end points, which are the black and white points), `apply`, `histogram` for the editor, `PRESETS`. |
@@ -248,6 +250,22 @@ page.
   button in the same rerun converts or approves the page.
 - Every user-facing string goes through `i18n.t`; `tests/test_i18n.py` checks that every key used
   in `app/` exists in both languages with the same placeholders.
+
+## Security
+
+The app has no login: it is a single-user tool for one computer. What keeps it safe:
+
+| Risk | Measure |
+|---|---|
+| Others on the network using the app (photos, Gemini credit) | Compose publishes the port on `127.0.0.1` only; `COLORIN_BIND` opens it on purpose. |
+| The API key leaking from the UI | The Settings field never receives the saved key; an empty field keeps it. |
+| A book ZIP from someone else reaching outside its folder | Names that become paths (`Book.slug`, `Page.id`, `Page.original`) must match the patterns in `schema.py`, and `books.inside` checks every page path stays in its book; archive entries outside the book layout are skipped, and their total size is capped. |
+| Text from a book (titles, captions) turning into markup | The UI escapes Markdown with `ui.common.plain`; every user string in the PDF goes through `escape` or `plain_markup`, since ReportLab paragraphs read tags like `<img src>`. |
+| Secrets in git or in the image | `config/.env` and the Compose override are git-ignored; `.dockerignore` keeps them and the user data out of the image. |
+| Vulnerable dependencies | Pinned versions, audited with `pip-audit` on 2026-10-31 (none known); Dependabot proposes updates for pip, Docker and the dev container. |
+
+Not covered: the photos and captions sent to Gemini are processed by Google under the terms of the
+chosen access (Vertex AI or AI Studio).
 
 ## Differences from the plan
 

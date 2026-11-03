@@ -17,7 +17,7 @@ Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
 Marketplace = Literal["us", "uk", "es"]
 Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
-Engine = Literal["gemini", "draft", "mosaic"]
+Engine = Literal["gemini", "stable_diffusion", "draft", "mosaic"]
 # Mystery mosaics (mosaic.py): how each number is filled in (pencil tones or a palette of pen
 # patterns), and whether cells are whole squares or split along a diagonal into two triangles.
 MosaicFill = Literal["tones", "classic", "lines", "stipple", "geometric"]
@@ -27,6 +27,12 @@ Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior
 CoverColor = Literal["blue", "green", "orange", "purple", "pink", "teal"]
 ArtMode = Literal["collage", "text", "theme"]  # what an AI cover image is drawn from
 ArtSource = Literal["upload", "collage", "text", "theme"]
+# Names that become part of file paths (book folders, page folders, photo files): letters,
+# digits, "-" and "_" only, so a book imported from a ZIP cannot point outside its folder.
+SAFE_NAME = r"^[A-Za-z0-9_-]{1,64}$"
+SLUG = r"^[a-z0-9-]{1,200}$"
+PHOTO_FILE = r"^[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|webp)$"
+
 # Extra pages, in the order they are printed: the color test after the owner page, the
 # activities and their solutions after the coloring pages, then the diploma and the closing page.
 Extra = Literal["color_test", "word_search", "maze", "dots", "solutions", "diploma", "closing"]
@@ -41,7 +47,8 @@ BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
-ENGINES: tuple[Engine, ...] = ("gemini", "draft", "mosaic")
+ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion", "draft", "mosaic")
+AI_ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion")  # drawn by an AI: declared to Amazon KDP
 MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "classic", "lines", "stipple", "geometric")
 MOSAIC_CELLS: tuple[MosaicCells, ...] = ("square", "diagonal")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
@@ -133,7 +140,7 @@ class Listing(BaseModel):
 
 class Book(BaseModel):
     id: str
-    slug: str
+    slug: str = Field(pattern=SLUG)
     title: str
     subtitle: str = ""
     dedication: str = ""
@@ -201,8 +208,8 @@ class Version(BaseModel):
 
 
 class Page(BaseModel):
-    id: str
-    original: str  # file name under originals/
+    id: str = Field(pattern=SAFE_NAME)
+    original: str = Field(pattern=PHOTO_FILE)  # file name under originals/
     original_name: str  # name of the uploaded file
     title: str = ""
     subtitle: str = ""

@@ -4,58 +4,111 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import books, gemini, i18n, pages, templates, usage
-from app.core.config import AUTH_METHODS, LANGUAGES, get_settings, save_settings
+from app.core import books, gemini, i18n, pages, stable_diffusion, templates, usage
+from app.core.config import AUTH_METHODS, LANGUAGES, SD_SIZE_RANGE, SD_STEPS_RANGE, get_settings, save_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, STYLES, TEMPLATES
-from app.ui.common import flash, language_switch, seed, show_flash
+from app.ui.common import flash, language_switch, plain, seed, show_flash
+
+
+def _forget_api_key() -> None:
+    save_settings({"GEMINI_API_KEY": ""})
+    gemini.reset_clients()
+    st.session_state.pop("settings_api_key", None)
+
+
+def _render_gemini_settings() -> None:
+    settings = get_settings()
+    for field in ("auth", "project", "text_location", "image_location", "text_model", "image_model"):
+        seed(f"settings_{field}", getattr(settings, field))
+    # The saved API key never goes to the browser: the field starts empty, and an empty field
+    # keeps the saved key.
+    seed("settings_api_key", "")
+    st.caption(t("settings.help"))
+    with st.form("settings_form"):
+        col1, col2 = st.columns(2)
+        auth = col1.selectbox(
+            t("settings.auth"), AUTH_METHODS, format_func=lambda a: t(f"auth.{a}"), key="settings_auth"
+        )
+        api_key = col2.text_input(
+            t("settings.api_key"),
+            type="password",
+            placeholder=t("settings.api_key_saved", tail=settings.api_key[-4:]) if settings.api_key else "",
+            help=t("settings.api_key_help"),
+            key="settings_api_key",
+        )
+        col1, col2, col3 = st.columns(3)
+        project = col1.text_input(t("settings.project"), key="settings_project")
+        text_location = col2.text_input(t("settings.text_location"), key="settings_text_location")
+        image_location = col3.text_input(t("settings.image_location"), key="settings_image_location")
+        col4, col5 = st.columns(2)
+        text_model = col4.text_input(t("settings.text_model"), key="settings_text_model")
+        image_model = col5.text_input(t("settings.image_model"), key="settings_image_model")
+        save_col, test_col, _ = st.columns([1, 1, 3])
+        saved = save_col.form_submit_button(t("settings.save"), type="primary")
+        tested = test_col.form_submit_button(t("settings.save_test"))
+
+    if settings.api_key:
+        st.button(t("settings.api_key_forget"), on_click=_forget_api_key)
+    if saved or tested:
+        values = {
+            "GEMINI_AUTH": auth,
+            "GOOGLE_CLOUD_PROJECT": project.strip(),
+            "GOOGLE_CLOUD_LOCATION": text_location.strip(),
+            "GEMINI_IMAGE_LOCATION": image_location.strip(),
+            "GEMINI_TEXT_MODEL": text_model.strip(),
+            "GEMINI_IMAGE_MODEL": image_model.strip(),
+        }
+        if api_key.strip():
+            values["GEMINI_API_KEY"] = api_key.strip()
+        save_settings(values)
+        gemini.reset_clients()
+        st.success(t("settings.saved"))
+    if tested:
+        with st.spinner(t("settings.testing")):
+            try:
+                st.success(t("settings.ok", reply=gemini.check_connection()))
+            except gemini.GeminiError as exc:
+                st.error(t("settings.failed", error=exc))
+
+
+def _render_sd_settings() -> None:
+    settings = get_settings()
+    seed("settings_sd_url", settings.sd_url)
+    seed("settings_sd_steps", settings.sd_steps)
+    seed("settings_sd_size", settings.sd_size)
+    st.caption(t("settings.sd_help"))
+    with st.form("sd_settings_form"):
+        url = st.text_input(t("settings.sd_url"), placeholder="http://192.168.1.20:8081", key="settings_sd_url")
+        col1, col2 = st.columns(2)
+        steps = col1.slider(t("settings.sd_steps"), *SD_STEPS_RANGE, help=t("settings.sd_steps_help"), key="settings_sd_steps")
+        size = col2.slider(
+            t("settings.sd_size"), *SD_SIZE_RANGE, step=64, help=t("settings.sd_size_help"), key="settings_sd_size"
+        )
+        save_col, test_col, _ = st.columns([1, 1, 3])
+        saved = save_col.form_submit_button(t("settings.save"), type="primary")
+        tested = test_col.form_submit_button(t("settings.save_test"))
+    if saved or tested:
+        save_settings(
+            {"STABLE_DIFFUSION_URL": url.strip().rstrip("/"), "STABLE_DIFFUSION_STEPS": str(steps), "STABLE_DIFFUSION_SIZE": str(size)}
+        )
+        st.success(t("settings.saved"))
+    if tested:
+        with st.spinner(t("settings.sd_testing")):
+            try:
+                st.success(t("settings.sd_ok", state=stable_diffusion.check_connection()))
+            except stable_diffusion.StableDiffusionError as exc:
+                st.error(t("settings.failed", error=exc))
 
 
 def _render_settings_panel() -> None:
     settings = get_settings()
-    for field in ("auth", "api_key", "project", "text_location", "image_location", "text_model", "image_model"):
-        seed(f"settings_{field}", getattr(settings, field))
-    with st.expander(t("settings.title"), expanded=not settings.configured):
-        st.caption(t("settings.help"))
-        with st.form("settings_form"):
-            col1, col2 = st.columns(2)
-            auth = col1.selectbox(
-                t("settings.auth"), AUTH_METHODS, format_func=lambda a: t(f"auth.{a}"), key="settings_auth"
-            )
-            api_key = col2.text_input(
-                t("settings.api_key"), type="password", help=t("settings.api_key_help"), key="settings_api_key"
-            )
-            col1, col2, col3 = st.columns(3)
-            project = col1.text_input(t("settings.project"), key="settings_project")
-            text_location = col2.text_input(t("settings.text_location"), key="settings_text_location")
-            image_location = col3.text_input(t("settings.image_location"), key="settings_image_location")
-            col4, col5 = st.columns(2)
-            text_model = col4.text_input(t("settings.text_model"), key="settings_text_model")
-            image_model = col5.text_input(t("settings.image_model"), key="settings_image_model")
-            save_col, test_col, _ = st.columns([1, 1, 3])
-            saved = save_col.form_submit_button(t("settings.save"), type="primary")
-            tested = test_col.form_submit_button(t("settings.save_test"))
-
-        if saved or tested:
-            save_settings(
-                {
-                    "GEMINI_AUTH": auth,
-                    "GEMINI_API_KEY": api_key.strip(),
-                    "GOOGLE_CLOUD_PROJECT": project.strip(),
-                    "GOOGLE_CLOUD_LOCATION": text_location.strip(),
-                    "GEMINI_IMAGE_LOCATION": image_location.strip(),
-                    "GEMINI_TEXT_MODEL": text_model.strip(),
-                    "GEMINI_IMAGE_MODEL": image_model.strip(),
-                }
-            )
-            gemini.reset_clients()
-            st.success(t("settings.saved"))
-        if tested:
-            with st.spinner(t("settings.testing")):
-                try:
-                    st.success(t("settings.ok", reply=gemini.check_connection()))
-                except gemini.GeminiError as exc:
-                    st.error(t("settings.failed", error=exc))
+    with st.expander(t("settings.title"), expanded=not (settings.configured or settings.sd_configured)):
+        gemini_tab, sd_tab = st.tabs([t("settings.tab_gemini"), t("settings.tab_sd")])
+        with gemini_tab:
+            _render_gemini_settings()
+        with sd_tab:
+            _render_sd_settings()
 
 
 def _render_usage_panel() -> None:
@@ -94,7 +147,8 @@ def _open_book(slug: str) -> None:
 
 def _render_create_form() -> None:
     st.subheader(t("home.new_book"))
-    if not get_settings().configured:
+    settings = get_settings()
+    if not (settings.configured or settings.sd_configured):
         st.info(t("home.unconfigured"))
     with st.form("create_book", clear_on_submit=True):
         title = st.text_input(t("book.title"), placeholder=t("home.title_placeholder"))
@@ -134,7 +188,7 @@ def _render_create_form() -> None:
 def _duplicate(slug: str) -> None:
     source = books.load_book(slug)
     copy = books.duplicate_book(slug, t("home.copy_title", title=source.title))
-    flash("success", t("home.duplicated", title=copy.title))
+    flash("success", t("home.duplicated", title=plain(copy.title)))
 
 
 def _render_import() -> None:
@@ -150,7 +204,7 @@ def _render_import() -> None:
                 st.error(t("home.import_failed", error=exc))
                 return
             st.session_state.import_round = st.session_state.get("import_round", 0) + 1
-            flash("success", t("home.imported", title=book.title))
+            flash("success", t("home.imported", title=plain(book.title)))
             st.rerun()
 
 
@@ -172,9 +226,9 @@ def _render_book_list() -> None:
                 else:
                     st.caption(t("home.no_image"))
             with info_col:
-                st.markdown(f"**{book.title}**")
+                st.markdown(f"**{plain(book.title)}**")
                 if book.subtitle:
-                    st.caption(book.subtitle)
+                    st.caption(plain(book.subtitle))
                 approved = sum(p.status == "approved" for p in page_list)
                 st.caption(
                     " · ".join(
@@ -222,7 +276,7 @@ def _render_book_list() -> None:
     pending = st.session_state.get("pending_delete")
     target = books.load_book(pending) if pending else None
     if target:
-        st.warning(t("home.confirm_delete", title=target.title))
+        st.warning(t("home.confirm_delete", title=plain(target.title)))
         col_yes, col_no, _ = st.columns([1, 1, 4])
         if col_yes.button(t("home.yes_delete"), type="primary"):
             books.delete_book(pending)

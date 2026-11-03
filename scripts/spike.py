@@ -8,7 +8,8 @@ Run inside the container (spike/ is git-ignored and not mounted by default):
 Writes ``<out>/<photo>/<style>-<age>-raw.png`` and ``-clean.png``, ``<out>/results.json`` and
 one contact sheet per photo, ``<out>/<photo>-sheet.jpg``. ``--jobs toucan:cartoon:3-5 ...`` runs
 only those conversions; ``--reclean`` re-runs ``lineart.clean`` on the raw files already in
-``<out>`` without calling Gemini.
+``<out>`` without calling Gemini. ``--engine stable_diffusion`` draws with the Stable Diffusion
+server instead (``STABLE_DIFFUSION_URL``), one page at a time.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.core import gemini, imaging, lineart, usage
+from app.core import imaging, lineart, stable_diffusion, usage
 
 # Scenes keep their setting; single subjects get a simplified one (the book default).
 BACKGROUNDS = {"las-lajas": "keep", "pigeons": "keep"}
@@ -29,17 +30,20 @@ TITLES = {"toucan": "Keel-billed toucan", "las-lajas": "Las Lajas Sanctuary"}
 TILE = 480
 
 
-def convert(photo: Path, style: str, age: str, out: Path) -> dict:
+def convert(photo: Path, style: str, age: str, out: Path, engine: str = "gemini") -> dict:
     name = photo.stem
     background = BACKGROUNDS.get(name, "simplify")
-    prompt = imaging.build_prompt(style, age, background, TITLES.get(name, ""))
     image = lineart.load_image(photo.read_bytes())
-    result = {"photo": name, "style": style, "age": age, "background": background}
+    result = {"photo": name, "style": style, "age": age, "background": background, "engine": engine}
     start = time.time()
     try:
         with usage.book_context("spike"):
-            raw = imaging.render_coloring_page(photo.read_bytes(), image.size, prompt)
-    except gemini.GeminiError as exc:
+            if engine == "stable_diffusion":
+                raw = stable_diffusion.edit_image(image, imaging.build_sd_prompt(style, age, background))
+            else:
+                prompt = imaging.build_prompt(style, age, background, TITLES.get(name, ""))
+                raw = imaging.render_coloring_page(photo.read_bytes(), image.size, prompt)
+    except imaging.AI_ERRORS as exc:
         return {**result, "error": str(exc), "seconds": round(time.time() - start, 1)}
     (out / name).mkdir(parents=True, exist_ok=True)
     (out / name / f"{style}-{age}-raw.png").write_bytes(raw)
@@ -102,6 +106,7 @@ def main() -> None:
     parser.add_argument("--jobs", nargs="*", help="photo:style:age triples (default: every combination)")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--reclean", action="store_true")
+    parser.add_argument("--engine", choices=("gemini", "stable_diffusion"), default="gemini")
     args = parser.parse_args()
 
     photos = sorted(p for p in args.photos.glob("*.jpg") if not args.only or p.stem in args.only)
@@ -116,11 +121,12 @@ def main() -> None:
             photos = sorted({job[0] for job in jobs})
         else:
             jobs = [(p, s, a) for p in photos for s in args.styles for a in args.ages]
-        print(f"{len(jobs)} conversions, {args.workers} at a time")
+        workers = 1 if args.engine == "stable_diffusion" else args.workers  # the server draws one at a time
+        print(f"{len(jobs)} conversions, {workers} at a time")
         args.out.mkdir(parents=True, exist_ok=True)
-        with ThreadPoolExecutor(args.workers) as pool:
+        with ThreadPoolExecutor(workers) as pool:
             results = []
-            for result in pool.map(lambda job: convert(*job, args.out), jobs):
+            for result in pool.map(lambda job: convert(*job, args.out, args.engine), jobs):
                 print(json.dumps(result))
                 results.append(result)
     (args.out / "results.json").write_text(json.dumps(results, indent=2))

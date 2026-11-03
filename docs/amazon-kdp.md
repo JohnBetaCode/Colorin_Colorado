@@ -158,7 +158,7 @@ substantially**, including interior and cover images. In this app:
 
 | Content | AI-generated for KDP? |
 |---|---|
-| Pages converted with **✨ Convert with AI** (Gemini) | **Yes** |
+| Pages converted with **✨ Gemini** or **🖌️ Stable Diffusion** | **Yes** |
 | Pages from the **✏️ Free draft** (OpenCV, no AI) | No |
 | Captions, back cover text and copyright text you typed | No |
 | AI caption suggestions (phase 2), if used as written | Yes (text) |
