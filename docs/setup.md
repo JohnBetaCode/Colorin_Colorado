@@ -45,11 +45,11 @@ compose up -d`.
 
 | Branch | What it has | Docker image |
 |---|---|---|
-| `main` | Everything: AI and draft engines, mystery mosaics, PDF and Amazon KDP files. | Smaller, quicker to build |
-| `SAM` | `main` plus **background removal for mosaics with SAM2**, offline: it keeps only the subject (the bird) and leaves the background white. PyTorch (CPU) is installed in the image and the SAM2 model (about 320 MB, public, no account needed) downloads by itself the first time into `models/`. | About 2.3 GB |
+| `main` | Everything: AI and draft engines, mystery mosaics (one pen included) with **automatic background removal** (IS-Net, see [below](#background-removal)), page templates, PDF and Amazon KDP files. | About 0.9 GB |
+| `SAM` | Background removal for mosaics with **SAM2** instead, where you click points on the photo to say what is subject and what is background: more control on hard photos. PyTorch (CPU) is installed in the image and the SAM2 model (about 320 MB, public, no account needed) downloads by itself the first time into `models/`. It may lag behind `main` in other features. | About 2.3 GB |
 
-Use `main` unless you want background removal. To switch, change the branch and rebuild the
-image, since the two have different requirements:
+Use `main` unless you need to point at the subject by hand. To switch, change the branch and
+rebuild the image, since the two have different requirements:
 
 ```bash
 git switch SAM        # or: git switch main
@@ -58,7 +58,7 @@ docker compose up -d --build
 ```
 
 Books are shared between branches. A mosaic page saved with "Remove the background" on `SAM`
-still exports on `main`; converting it again there ignores that option.
+also removes it on `main`, with IS-Net (the points clicked on `SAM` are ignored there).
 
 ## Configuration
 
@@ -90,12 +90,25 @@ file is mounted only by `docker-compose.override.yml`, which you copy from
 `docker-compose.override.example.yml` when you use `adc` (the `run-app` script does it for you
 when the file exists). Both `config/.env` and the override are git-ignored.
 
+## Background removal
+
+Mosaics can remove the photo's background with **IS-Net** (Apache-2.0), a small model that runs on
+the CPU with ONNX Runtime, offline and free. It downloads by itself the first time it is used
+(about 180 MB) into `models/`, which Compose mounts, so rebuilds keep it; the app checks the
+file's SHA-256 before using it. To download it in advance:
+
+```bash
+mkdir -p models && curl -L -o models/isnet-general-use.onnx \
+  https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx
+```
+
 ## Data
 
 | Path | Contents |
 |---|---|
 | `books/<slug>/` | Each book: `book.json`, `pages.json`, uploaded photos, every coloring-page version, cover images, PDF exports and KDP covers. |
 | `data/usage.jsonl` | One line per Gemini call with tokens and estimated cost, and one per Stable Diffusion page (no cost). |
+| `models/` | Downloaded models (background removal). Safe to delete: they download again. |
 
 Both are bind-mounted and git-ignored. Back up `books/` to keep your books.
 

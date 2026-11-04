@@ -7,10 +7,25 @@ already on disk when a button in the same rerun converts or approves the page.
 
 from __future__ import annotations
 
+import numpy as np
 import streamlit as st
 from PIL import Image
 
-from app.core import books, captions, commons, export, gemini, grouping, imaging, mosaic, pages, templates, tones
+from app.core import (
+    background,
+    books,
+    captions,
+    commons,
+    export,
+    gemini,
+    grouping,
+    imaging,
+    mosaic,
+    page_templates,
+    pages,
+    templates,
+    tones,
+)
 from app.core.config import get_settings
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import (
@@ -32,6 +47,7 @@ from app.ui.curve_editor import curve_editor
 
 MIN_CROP = 10  # percent of the photo on each axis
 PREVIEW_PX = 1000  # long side of the mosaic solution shown in the workbench
+MIN_CELL_MM = 3.0  # smaller mosaic cells are hard to fill by hand
 # Option meaning "use the book's setting" (stored as None). Not None itself: a selectbox
 # whose state is None shows as empty.
 BOOK_DEFAULT = "book"
@@ -191,7 +207,8 @@ def _approve(slug: str, page_id: str, next_id: str | None) -> None:
         st.session_state.wb_page = next_id
 
 
-MOSAIC_FIELDS = ("fill", "cells", "tones", "columns", "contrast", "brightness", "number_white")
+MOSAIC_FIELDS = ("fill", "cells", "tones", "columns", "contrast", "brightness", "number_white", "remove_background")
+SECONDS_PER_CELL = 2.5  # to draw one mark or fill one cell, for the time estimate
 
 
 def _mosaic_from_widgets(page_id: str) -> MosaicSettings:
@@ -218,20 +235,39 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
             t("wb.mosaic_fill"), MOSAIC_FILLS, format_func=lambda f: t(f"mosaic_fill.{f}"),
             key=f"mosaic_fill_{page.id}", **save,
         )
+        pen = settings.fill == "pen"
+        if pen:
+            st.caption(t("wb.mosaic_pen_note"))
+        # One pen always has six marks and up to PEN_MAX_COLUMNS: keep the sliders' saved
+        # values inside the range they show, or Streamlit refuses to draw them.
+        tones_key, columns_key = f"mosaic_tones_{page.id}", f"mosaic_columns_{page.id}"
+        max_columns = mosaic.PEN_MAX_COLUMNS if pen else mosaic.MAX_COLUMNS["square"]
+        st.session_state[tones_key] = min(max(st.session_state[tones_key], mosaic.MIN_TONES), mosaic.MAX_TONES)
+        st.session_state[columns_key] = min(max(st.session_state[columns_key], mosaic.MIN_COLUMNS), max_columns)
         col1, col2 = st.columns(2)
         col1.radio(
             t("wb.mosaic_cells"), MOSAIC_CELLS, format_func=lambda c: t(f"mosaic_cells.{c}"), horizontal=True,
-            key=f"mosaic_cells_{page.id}", **save,
+            disabled=pen, key=f"mosaic_cells_{page.id}", **save,
         )
         col2.slider(
             t("wb.mosaic_tones"), mosaic.MIN_TONES, mosaic.MAX_TONES, help=t("wb.mosaic_tones_help"),
-            key=f"mosaic_tones_{page.id}", **save,
+            disabled=pen, key=f"mosaic_tones_{page.id}", **save,
         )
         st.slider(
-            t("wb.mosaic_columns"), mosaic.MIN_COLUMNS, mosaic.MAX_COLUMNS["square"],
-            help=t("wb.mosaic_columns_help", max=mosaic.MAX_COLUMNS["diagonal"]),
+            t("wb.mosaic_columns"), mosaic.MIN_COLUMNS, max_columns,
+            help=t("wb.mosaic_columns_help", max=mosaic.MAX_COLUMNS["diagonal"], pen_max=mosaic.PEN_MAX_COLUMNS),
             key=f"mosaic_columns_{page.id}", **save,
         )
+        _render_mosaic_size(book, page)
+        ready = background.available()
+        st.checkbox(
+            t("wb.mosaic_background"),
+            help=t("wb.mosaic_background_help", mb=background.MODEL_MB) if ready else t("wb.mosaic_background_unavailable"),
+            disabled=not ready,
+            key=f"mosaic_remove_background_{page.id}", **save,
+        )
+        if settings.remove_background and ready:
+            _render_cut(book, page)
         col1, col2 = st.columns(2)
         col1.slider(t("wb.mosaic_contrast"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_contrast_{page.id}", **save)
         col2.slider(t("wb.mosaic_brightness"), -mosaic.LIMIT, mosaic.LIMIT, step=5, key=f"mosaic_brightness_{page.id}", **save)
@@ -257,6 +293,61 @@ def _render_mosaic_options(book: Book, page: Page) -> None:
 
 
 @st.cache_data(max_entries=16, show_spinner=False)
+def _mosaic_grid(book_json: str, page_json: str) -> np.ndarray:
+    """The grid the page's current options make; cached on the saved book and page."""
+    return imaging.mosaic_draft(Book.model_validate_json(book_json), Page.model_validate_json(page_json))[0]
+
+
+def _background_spinner() -> str:
+    if background.model_downloaded():
+        return t("wb.mosaic_background_working")
+    return t("wb.mosaic_background_downloading", mb=background.MODEL_MB)
+
+
+def _render_mosaic_size(book: Book, page: Page) -> None:
+    """Resolution as it will print: grid, cell size and how much there is to draw."""
+    try:
+        with st.spinner(_background_spinner()):
+            grid = _mosaic_grid(book.model_dump_json(), page.model_dump_json())
+    except background.BackgroundError as exc:
+        st.warning(t("wb.mosaic_background_failed", error=exc))
+        return
+    settings = mosaic.settings_for(book, page)
+    rows, cols = grid.shape[:2]
+    cells = len(mosaic.numbered(grid, settings))
+    mm = export.mosaic_cell_mm(book, rows, cols)
+    st.caption(
+        t(
+            "wb.mosaic_size",
+            rows=rows, cols=cols, mm=mm, cells=cells,
+            minutes=max(1, round(cells * SECONDS_PER_CELL / 60)), page_size=t(f"page_size.{book.page_size}"),
+        )
+    )
+    if mm < MIN_CELL_MM:
+        st.warning(t("wb.mosaic_size_small", mm=MIN_CELL_MM))
+
+
+@st.cache_data(max_entries=8, show_spinner=False)
+def _cut_image(book_json: str, page_json: str) -> Image.Image:
+    book, page = Book.model_validate_json(book_json), Page.model_validate_json(page_json)
+    settings = mosaic.settings_for(book, page)
+    photo = pages.cropped_photo(book.slug, page, curve=False)
+    image = background.outline(photo, background.subject_mask(book.slug, page, settings))
+    image.thumbnail((PREVIEW_PX // 2, PREVIEW_PX // 2))
+    return image
+
+
+def _render_cut(book: Book, page: Page) -> None:
+    try:
+        with st.spinner(_background_spinner()):
+            image = _cut_image(book.model_dump_json(), page.model_dump_json())
+    except background.BackgroundError as exc:
+        st.warning(t("wb.mosaic_background_failed", error=exc))
+        return
+    st.image(image, caption=t("wb.mosaic_cut"), width=320)
+
+
+@st.cache_data(max_entries=16, show_spinner=False)
 def _mosaic_images(book_json: str, page_json: str, draft: bool) -> tuple[Image.Image, Image.Image]:
     """The mosaic as printed and its solution: the selected version's, or with ``draft`` the one
     the current options make. Keyed by the saved book and page, so each change renders once."""
@@ -268,7 +359,11 @@ def _mosaic_images(book_json: str, page_json: str, draft: bool) -> tuple[Image.I
 
 
 def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
-    printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
+    try:
+        printed, solution = _mosaic_images(book.model_dump_json(), page.model_dump_json(), draft)
+    except background.BackgroundError as exc:
+        st.warning(t("wb.mosaic_background_failed", error=exc))
+        return
     puzzle_tab, solution_tab = st.tabs([t("wb.mosaic_puzzle"), t("wb.mosaic_solution")])
     puzzle_tab.image(printed, width="stretch")
     solution_tab.image(solution, width="stretch")
@@ -282,7 +377,7 @@ def _convert(book: Book, page: Page, engine: Engine, replace: int | None = None)
     with st.spinner(t(spinner)):
         try:
             updated = imaging.convert_page(book, page, engine, replace=replace)
-        except imaging.AI_ERRORS as exc:
+        except imaging.CONVERSION_ERRORS as exc:
             st.error(t("wb.failed", error=exc))
             return
     st.session_state.pop(f"version_{page.id}", None)
@@ -480,6 +575,56 @@ def _render_caption(book: Book, page: Page) -> None:
     )
 
 
+def _save_page_template(slug: str, page_id: str) -> None:
+    value = st.session_state[f"page_template_{page_id}"]
+    pages.update_page(slug, page_id, page_template=None if value == BOOK_DEFAULT else value)
+
+
+@st.cache_data(max_entries=8, show_spinner=False)
+def _page_preview(book_json: str, page_json: str) -> Image.Image:
+    return export.page_preview(Book.model_validate_json(book_json), Page.model_validate_json(page_json))
+
+
+def _render_page_template(book: Book, page: Page) -> None:
+    """The page's template, its margin inside it, and the page as it will print."""
+    chosen = page_templates.for_page(book, page)
+    with st.expander(t("wb.page_template"), expanded=chosen is not None):
+        book_name = (
+            page_templates.name(book, book.page_template, t)
+            if book.page_template in page_templates.choices(book)
+            else t("wb.page_template_none")
+        )
+        options = [BOOK_DEFAULT, page_templates.NO_TEMPLATE, *page_templates.choices(book)]
+        seed(f"page_template_{page.id}", page.page_template if page.page_template in options else BOOK_DEFAULT)
+        st.selectbox(
+            t("wb.page_template_choice"),
+            options,
+            format_func=lambda o: (
+                t("wb.book_default", value=book_name)
+                if o == BOOK_DEFAULT
+                else t("wb.page_template_none") if o == page_templates.NO_TEMPLATE else page_templates.name(book, o, t)
+            ),
+            key=f"page_template_{page.id}",
+            on_change=_save_page_template,
+            args=(book.slug, page.id),
+        )
+        if chosen is None:
+            st.caption(t("wb.page_template_help"))
+            return
+        seed(f"template_inset_{page.id}", page.template_inset)
+        st.slider(
+            t("wb.page_template_inset"),
+            0,
+            page_templates.MAX_INSET,
+            format="%d %%",
+            help=t("wb.page_template_inset_help"),
+            key=f"template_inset_{page.id}",
+            on_change=_save_field,
+            args=(book.slug, page.id, "template_inset"),
+        )
+        st.image(_page_preview(book.model_dump_json(), page.model_dump_json()), caption=t("wb.page_template_preview"), width=340)
+
+
 def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
     st.markdown(f"#### {t('wb.coloring_page')} · {t(f'status.{page.status}')}")
     path = pages.selected_path(book.slug, page)
@@ -490,6 +635,7 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
         st.image(str(path), width="stretch")
         for warning in page.selected_version.warnings:
             st.warning(t(f"warning.{warning}"))
+        _render_page_template(book, page)
     else:
         st.info(t("wb.not_converted"))
 

@@ -326,6 +326,12 @@ run end to end yet.
   a photo" rule: it is not a coloring page.
 - **2026-10-31, API keys:** Gemini can be reached with an API key (Vertex AI express or Google AI
   Studio), for people without a Google Cloud project.
+- **2026-11-04, one pen and background removal:** one-pen mosaics (six marks per cell) and
+  offline background removal with IS-Net, a small ONNX model (180 MB, no PyTorch), chosen over
+  the `SAM` branch's SAM2 for weight (the image grows by about 70 MB instead of 1.5 GB); the same
+  interface lets SAM2 and its click points join later.
+- **2026-11-04, page templates:** decorative frames per book and per page, predefined (drawn as
+  colorable outlines) or uploaded.
 - **2026-10-31, activities are generated, not drawn:** word searches, mazes and connect-the-dots
   come from code and the book's own pages, seeded with the book id: reproducible, free, and the
   solutions always match. The AI is not asked to draw puzzles.

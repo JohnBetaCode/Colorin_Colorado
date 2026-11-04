@@ -41,7 +41,12 @@ The pages are drawn by Gemini, or, if you have one, by your own **Stable Diffusi
 
 Without the AI, a photo can also become a **mystery mosaic**: a faint grid with a number in every
 cell and a legend that says how to fill each one. Color it in and the picture appears; the
-solutions are at the end of the book.
+solutions are at the end of the book. In the **one-pen** version every cell gets one of six marks
+(■ ✳ ✕ \\ / or nothing) that blend into the photo from a distance, and a small model that runs on
+your computer can remove the background so only the subject is left.
+
+Every coloring page can also go inside a **page template**: a frame of stars, clouds, flowers or
+waves that can be colored too, or a design of your own.
 
 ## The workbench
 
@@ -55,8 +60,8 @@ the right. Crop, convert, regenerate with instructions, approve, next.
 The [setup guide](docs/setup.md) gets it running with Docker in a few minutes, then open
 http://localhost:8502 and create your first book.
 
-The `SAM` branch adds background removal for mystery mosaics with SAM2, offline; see
-[branches](docs/setup.md#branches).
+The `SAM` branch removes backgrounds with SAM2 instead, where you click the subject on the photo;
+see [branches](docs/setup.md#branches).
 
 ## Learn more
 
@@ -80,3 +85,5 @@ Basile Morin (CC BY-SA 4.0), girl with pigeons by Ken Ketch (CC BY 2.0). The ima
 `docs/images` made from them keep those licenses, so the ones made from the laughing boy are
 CC BY-SA 4.0. The banner was drawn by Gemini from the toucan. The PDF typeface, Andika, is by SIL
 under the SIL Open Font License; it is installed in the Docker image, not stored in this repository.
+The background-removal model, IS-Net (`isnet-general-use`, Apache-2.0), downloads the first time
+it is used and is not stored here either.

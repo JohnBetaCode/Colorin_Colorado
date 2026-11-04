@@ -33,7 +33,9 @@ from app.core.schema import Book, Page
 BOOKS_DIR = ROOT_DIR / "books"
 SUBFOLDERS = ("originals", "lineart", "exports")
 # What a book archive carries: everything but its exports, which can be rebuilt.
-ARCHIVE_ENTRIES = re.compile(r"^(book\.json|pages\.json|originals/[^/]+|lineart/[^/]+/[^/]+|cover_art/[^/]+)$")
+ARCHIVE_ENTRIES = re.compile(
+    r"^(book\.json|pages\.json|originals/[^/]+|lineart/[^/]+/[^/]+|cover_art/[^/]+|page_templates/[^/]+)$"
+)
 MAX_ARCHIVE_BYTES = 2_000_000_000  # uncompressed, against zip bombs
 
 

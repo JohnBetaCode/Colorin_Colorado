@@ -15,12 +15,14 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 
-from app.core import gemini, lineart, mosaic, pages, stable_diffusion, usage
+from app.core import background, gemini, lineart, mosaic, pages, stable_diffusion, usage
 from app.core.books import now
 from app.core.schema import Book, Engine, MosaicSettings, Page, Version
 
 # What a failed AI conversion raises, whichever engine drew it.
 AI_ERRORS = (gemini.GeminiError, stable_diffusion.StableDiffusionError)
+# What a conversion can raise: the AI's errors, or a mosaic's background that cannot be removed.
+CONVERSION_ERRORS = (*AI_ERRORS, background.BackgroundError)
 
 AI_PAGE_COST_USD = 0.14  # estimate shown before converting many pages at once
 SD_PAGE_MINUTES = 1.5  # Stable Diffusion, one page at a time: estimate shown before converting many
@@ -212,13 +214,17 @@ class Rendered:
 
 
 def mosaic_draft(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
-    """The mystery mosaic the page's current settings make, without storing it (previews)."""
+    """The mystery mosaic the page's current settings make, without storing it (previews).
+
+    Raises ``background.BackgroundError`` when the background cannot be removed.
+    """
     settings = mosaic.settings_for(book, page)
-    return mosaic.make_grid(pages.cropped_photo(book.slug, page), settings), settings
+    subject = background.subject_mask(book.slug, page, settings) if settings.remove_background else None
+    return mosaic.make_grid(pages.cropped_photo(book.slug, page), settings, subject), settings
 
 
 def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
-    """Convert a page's (cropped) photo without storing anything. Raises one of ``AI_ERRORS``."""
+    """Convert a page's (cropped) photo without storing anything. Raises one of ``CONVERSION_ERRORS``."""
     style = page.style or book.style
     background = page.background or book.background
     if engine == "mosaic":
@@ -267,7 +273,8 @@ def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = N
     server, slow), ``"draft"`` (offline, free) or ``"mosaic"`` (a mystery mosaic, offline, free).
     With ``replace``, that version is deleted once the new one is stored: versions are never
     overwritten, so the replacement gets the next number.
-    Raises one of ``AI_ERRORS`` when the AI call fails; nothing is stored or deleted then.
+    Raises one of ``CONVERSION_ERRORS`` when the AI call fails or a mosaic's background cannot be
+    removed; nothing is stored or deleted then.
     """
     stored = _store(book, render_page(book, page, engine))
     if replace is not None:
@@ -293,7 +300,7 @@ def convert_pages(
             try:
                 _store(book, future.result())
                 error = None
-            except AI_ERRORS as exc:
+            except CONVERSION_ERRORS as exc:
                 error = str(exc)
                 failures.append((page, error))
             if on_done:

@@ -25,6 +25,14 @@ part.
   cells can go without a number, so the finished picture stays clean. Square cells or cells split diagonally,
   2 to 5 tones, the grid size and the contrast are adjustable; the page hides its title and photo,
   and the solutions are printed at the end of the book.
+- **One-pen mosaics**: every cell gets one of six marks (■ ✳ ✕ \ / or nothing), and from a
+  distance they blend into the photo, like a newspaper picture. The single strokes follow the
+  photo's edges. The menu shows the real cell size and how long the page takes to draw.
+- **Background removal for mosaics**, offline: a small model that runs on your computer keeps
+  only the subject, frames the grid on it and leaves the rest as white paper.
+- **Page templates**: a frame around every coloring page (double frame, stars, sky and grass,
+  corner flowers, waves, lace), which can be colored too, for the whole book or page by page; or
+  upload your own design, and the app finds where the drawing goes.
 - **Activities from your own pages**: a word search with the book's words, a maze, a
   connect-the-dots traced from a drawing, their solutions, a color test page, a diploma and a
   closing page.

@@ -16,6 +16,8 @@ services:
       # Books (photos, coloring pages, exports) and the usage log persist on the host
       - ./books:/workspace/books
       - ./data:/workspace/data
+      # Downloaded models (background removal), kept between rebuilds
+      - ./models:/workspace/models
       # Settings (config/.env)
       - ./config:/workspace/config
       # Google Cloud credentials (GEMINI_AUTH=adc) are mounted by docker-compose.override.yml,

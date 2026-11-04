@@ -6,10 +6,10 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.core import books, export
+from app.core import books, export, page_templates, pages
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import EXTRAS, PAGE_SIZES, Book, Page
-from app.ui.common import plain, seed
+from app.ui.common import flash, plain, seed
 
 FIRST_PAGE = "first"  # cover option stored as None; not None itself, which a selectbox shows as empty
 
@@ -68,6 +68,92 @@ def _names(page_list: list[Page]) -> str:
     return plain(", ".join(p.title.strip() or p.original_name for p in page_list))
 
 
+AREA_SIDES = ("left", "top", "right", "bottom")
+
+
+def _template_label(book: Book, option: str) -> str:
+    if option == page_templates.NO_TEMPLATE:
+        return t("wb.page_template_none")
+    return page_templates.name(book, option, t)
+
+
+def _save_default_template(slug: str) -> None:
+    book = books.load_book(slug)
+    value = st.session_state[f"export_page_template_{slug}"]
+    book.page_template = None if value == page_templates.NO_TEMPLATE else value
+    books.save_book(book)
+
+
+def _save_area(slug: str, template_id: str) -> None:
+    area = tuple(st.session_state[f"template_{side}_{template_id}"] / 100 for side in AREA_SIDES)
+    try:
+        page_templates.set_area(books.load_book(slug), template_id, area)
+    except ValueError:
+        flash("warning", t("export.page_template_area_small"))
+
+
+def _delete_template(slug: str, template_id: str) -> None:
+    page_templates.delete_upload(books.load_book(slug), template_id)
+    flash("success", t("export.page_template_deleted"))
+
+
+def _render_page_templates(book: Book) -> None:
+    st.markdown(f"##### {t('export.page_templates')}")
+    st.caption(t("export.page_templates_help"))
+    options = [page_templates.NO_TEMPLATE, *page_templates.choices(book)]
+    seed(f"export_page_template_{book.slug}", book.page_template if book.page_template in options else options[0])
+    st.selectbox(
+        t("export.page_template_default"),
+        options,
+        format_func=lambda o: _template_label(book, o),
+        key=f"export_page_template_{book.slug}",
+        on_change=_save_default_template,
+        args=(book.slug,),
+    )
+    size = export.content_box(book)[2:]
+    with st.expander(t("export.page_templates_gallery")):
+        columns = st.columns(6)
+        for i, template_id in enumerate(page_templates.choices(book)):
+            columns[i % 6].image(
+                page_templates.thumbnail(book, template_id, size, px=220), caption=plain(_template_label(book, template_id))
+            )
+    with st.expander(t("export.page_template_upload")):
+        st.caption(t("export.page_template_upload_help"))
+        round_ = st.session_state.get("template_upload_round", 0)  # a new key empties the uploader
+        file = st.file_uploader(t("export.page_template_upload_label"), type=list(pages.UPLOAD_TYPES), key=f"template_file_{round_}")
+        name = st.text_input(t("export.page_template_name"), key=f"template_name_{round_}")
+        if file and st.button(t("export.page_template_add"), type="primary"):
+            try:
+                updated = page_templates.add_upload(book, file.getvalue(), name or file.name.rsplit(".", 1)[0])
+            except ValueError as exc:
+                st.error(t("export.page_template_unreadable", error=exc))
+                return
+            st.session_state.template_upload_round = round_ + 1
+            flash("success", t("export.page_template_added", name=plain(updated.page_templates[-1].name)))
+            st.rerun()
+    for template in book.page_templates:
+        with st.expander(t("export.page_template_edit", name=plain(template.name))):
+            controls, picture = st.columns([3, 2])
+            for side, value, low, high in zip(AREA_SIDES, template.area, (0, 0, 50, 50), (50, 50, 100, 100)):
+                seed(f"template_{side}_{template.id}", round(value * 100))
+                controls.slider(
+                    t(f"export.page_template_{side}"),
+                    low,
+                    high,
+                    format="%d %%",
+                    key=f"template_{side}_{template.id}",
+                    on_change=_save_area,
+                    args=(book.slug, template.id),
+                )
+            picture.image(page_templates.thumbnail(book, template.id, size, px=260), width="stretch")
+            controls.button(
+                t("export.page_template_delete"),
+                key=f"template_delete_{template.id}",
+                on_click=_delete_template,
+                args=(book.slug, template.id),
+            )
+
+
 def _latest_export(book: Book) -> Path | None:
     files = sorted(export.exports_dir(book).glob("*.pdf"), key=lambda f: f.stat().st_mtime)
     return files[-1] if files else None
@@ -109,6 +195,7 @@ def _render_options(book: Book, report: export.Preflight) -> None:
             args=(book.slug, field),
         )
     _render_extras(book, report)
+    _render_page_templates(book)
     seed(f"export_legal_{book.slug}", book.legal)
     st.text_area(
         t("export.legal"),

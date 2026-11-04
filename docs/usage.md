@@ -47,6 +47,23 @@ Changing any of them affects new conversions only.
 
 ![Kawaii, mandala and realistic for adults](images/more-styles.jpg)
 
+## Mystery mosaics
+
+**🔳 Monochrome** in the workbench turns the photo into a color-by-number puzzle instead of a
+drawing: a faint grid with a number in each cell and a legend that says how to fill each number.
+It is free and works offline. **🔳 Monochrome options** shows the puzzle and its solution as you
+change the settings, and saves it as a new version or replaces the current one:
+
+| Setting | What it does |
+|---|---|
+| How to fill in | Pencil tones, a pen pattern palette, or **One pen: one mark per cell**: six marks (■ ✳ ✕ \\ / and nothing), the strokes following the photo's edges. |
+| Cells, tones | Square or split diagonally, 2 to 5 tones (one pen always uses square cells and its six marks). |
+| Columns | The resolution. Under the slider: the grid, the **cell size as printed**, how many cells there are to fill and roughly how long it takes. Cells under 3 mm are hard to fill by hand. |
+| ✂️ Remove the background | Keeps only the subject: the grid frames it and the rest stays white paper. A small model runs on your computer (no internet or cost after a first download of about 180 MB); the preview shows the cut. |
+| Contrast, brightness | Lighter or darker overall. |
+
+The page's title and photo stay hidden; the solutions are printed at the end of the book.
+
 ## Captions
 
 - **Title**: the name of what is being colored ("Tucán pico iris", "Palomas en la plaza").
@@ -107,6 +124,21 @@ extra page adds two pages to the book.
 The fixed labels of the PDF follow the **book language**, not the app language: a Spanish app can
 make an English book. Pages without a coloring page are skipped; pages not yet approved are
 included and listed in the summary. Every build is a new file in `books/<slug>/exports/`.
+
+## Page templates
+
+A template is a design around a coloring page, which can be colored too. In **📄 Export PDF →
+🖼️ Page templates**:
+
+- **The book's template**: none, one of the six designs (double frame, stars, sky and grass,
+  corner flowers, waves and bubbles, lace), or one of yours. **See the templates** shows them all.
+- **📤 Upload a template**: an image with an empty middle. It is turned black and white, and the
+  app finds the empty area where the drawing and its caption go; adjust that area with the four
+  edge sliders, or delete the template.
+
+In the **🎨 Workbench**, **🖼️ Page template** under the drawing changes it for that page (or
+removes it), sets a margin inside it, and shows the page as it will print. Templates go on
+coloring pages only, not on mosaics or activities.
 
 ## Selling on Amazon
 

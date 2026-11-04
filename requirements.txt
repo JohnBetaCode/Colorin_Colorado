@@ -10,6 +10,7 @@ opencv-python-headless==4.12.0.88
 numpy==2.2.6                  # opencv-python-headless 4.12 needs numpy<2.3
 pypdfium2==4.30.0             # renders the PDFs into the listing images
 requests==2.34.2              # the Stable Diffusion server (stable_diffusion.py)
+onnxruntime==1.31.1           # runs the background-removal model (background.py) on the CPU
 
 # Tests
 pytest==9.2.0

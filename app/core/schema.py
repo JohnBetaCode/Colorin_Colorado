@@ -20,7 +20,7 @@ Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py 
 Engine = Literal["gemini", "stable_diffusion", "draft", "mosaic"]
 # Mystery mosaics (mosaic.py): how each number is filled in (pencil tones or a palette of pen
 # patterns), and whether cells are whole squares or split along a diagonal into two triangles.
-MosaicFill = Literal["tones", "classic", "lines", "stipple", "geometric"]
+MosaicFill = Literal["tones", "classic", "lines", "stipple", "geometric", "pen"]  # pen: one mark per cell
 MosaicCells = Literal["square", "diagonal"]
 Status = Literal["pending", "converted", "approved"]
 Ink = Literal["black", "standard_color", "premium_color"]  # Amazon KDP interior ink, white paper
@@ -49,7 +49,7 @@ MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
 ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion", "draft", "mosaic")
 AI_ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion")  # drawn by an AI: declared to Amazon KDP
-MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "classic", "lines", "stipple", "geometric")
+MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "classic", "lines", "stipple", "geometric", "pen")
 MOSAIC_CELLS: tuple[MosaicCells, ...] = ("square", "diagonal")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
 INKS: tuple[Ink, ...] = ("black", "standard_color", "premium_color")
@@ -76,6 +76,8 @@ class MosaicSettings(BaseModel):
     # White cells carry a number too: the picture stays hidden until colored, but the finished
     # page shows those digits.
     number_white: bool = False
+    # The subject is cut out and the background becomes white paper (background.py).
+    remove_background: bool = False
 
     @field_validator("fill", mode="before")
     @classmethod
@@ -92,6 +94,16 @@ class CoverArt(BaseModel):
     source: ArtSource
     prompt: str = ""  # what the author typed: the description, or extra instructions
     page_ids: list[str] = Field(default_factory=list)  # pages a collage was drawn from
+    created_at: str
+
+
+class PageTemplate(BaseModel):
+    """A page design the author uploaded: ``page_templates/<id>.png``, 1 bit (page_templates.py)."""
+
+    id: str = Field(pattern=SAFE_NAME)
+    name: str
+    # Where the drawing and its caption go: left, top, right, bottom, fractions of the image.
+    area: tuple[float, float, float, float] = (0.1, 0.1, 0.9, 0.9)
     created_at: str
 
 
@@ -143,6 +155,8 @@ class Book(BaseModel):
     cover_color: CoverColor = "blue"
     back_text: str = ""
     listing: Listing = Field(default_factory=Listing)
+    page_template: str | None = None  # the template coloring pages use unless they choose; None: none
+    page_templates: list[PageTemplate] = Field(default_factory=list)  # the author's uploads
     cover_art: list[CoverArt] = Field(default_factory=list)  # never overwritten, like page versions
     cover_art_selected: int | None = None  # None: the cover page's line art on the front
     mosaic: MosaicSettings | None = None  # None: the age group's defaults
@@ -194,6 +208,8 @@ class Page(BaseModel):
     info: str = ""
     translation: Caption = Field(default_factory=Caption)  # the caption in the book's second language
     credit: str = ""  # who took the photo and its license, printed on the copyright page
+    page_template: str | None = None  # None: the book's template; "none": no template on this page
+    template_inset: int = 0  # percent: extra margin inside the template's area
     license: License = "unknown"
     source_url: str = ""  # where the photo comes from, e.g. its Wikimedia Commons page
     style: Style | None = None  # None: the book's style

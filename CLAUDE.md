@@ -37,6 +37,13 @@ name a country or city (the author's own books can be about anything).
   "UI rules" in `docs/architecture.md` for why (lost clicks).
 - `books/`, `data/`, `spike/` and `config/.env` are user data and git-ignored. Never commit them and
   never put a real GCP project ID or API key in `config/.env.example`.
+- One-pen mosaics (`fill="pen"`) keep white paper white: no equalization in their tone mapping.
+  Background removal (`background.py`) keeps the `SAM` branch's interface (`subject_mask`,
+  `available`, `BackgroundError`), so both can live in one module; its model is pinned by SHA-256.
+- Page templates draw only on coloring pages. Predefined designs and their areas are measured from
+  the page edges in units of the short side, so they fit every page size; check new designs at
+  Letter and square proportions (`tests/test_page_templates.py`).
+- `models/` holds downloaded models: git- and Docker-ignored, never committed.
 - Security (see "Security" in `docs/architecture.md`): never seed a widget with a saved secret;
   any new name that becomes part of a path needs a pattern in `schema.py` and a `books.inside`
   check; user text goes through `ui.common.plain` in Markdown and `escape` in ReportLab.

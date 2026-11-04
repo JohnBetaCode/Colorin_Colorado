@@ -36,7 +36,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
-from app.core import extras, i18n, mosaic, pages
+from app.core import extras, i18n, mosaic, page_templates, pages
 from app.core.books import book_path
 from app.core.schema import Book, MosaicSettings, Page
 
@@ -114,9 +114,12 @@ class Layout:
         """x, y, width, height of the area inside the margins, above the footer."""
         return MARGIN, MARGIN + FOOTER, self.width - 2 * MARGIN, self.height - 2 * MARGIN - FOOTER
 
-    def boxes(self, with_info: bool) -> tuple[tuple[float, float, float, float], tuple[float, float, float, float] | None]:
-        """Line-art box and info box (or None) for one coloring sheet."""
-        x, y, w, h = self.content
+    def boxes(
+        self, with_info: bool, content: tuple[float, float, float, float] | None = None
+    ) -> tuple[tuple[float, float, float, float], tuple[float, float, float, float] | None]:
+        """Line-art box and info box (or None) for one coloring sheet, inside ``content``
+        (a page template's area) or the whole content box."""
+        x, y, w, h = content or self.content
         if not with_info:
             return (x, y, w, h), None
         box_h = h * BOX_RATIO
@@ -220,10 +223,24 @@ def draw_text(c: Canvas, items: list[Paragraph], box: tuple[float, float, float,
     c.restoreState()
 
 
+def content_box(book: Book) -> tuple[float, float, float, float]:
+    """The page's printable box in points, inside the margins and above the page number."""
+    return _layout(book).content
+
+
+def sheet_area(book: Book, page: Page, layout: Layout) -> tuple[float, float, float, float]:
+    """Where a coloring page's drawing and caption go: its template's area, or the content box."""
+    template = page_templates.for_page(book, page)
+    if template is None:
+        return layout.content
+    return page_templates.drawing_box(book, template, layout.content, page.template_inset)
+
+
 def caption_fits(book: Book, page: Page, fonts: Fonts | None = None) -> bool:
     if not page.has_caption:
         return True
-    _, info = _layout(book).boxes(True)
+    layout = _layout(book)
+    _, info = layout.boxes(True, sheet_area(book, page, layout))
     photo = _photo_box(info, pages.photo_size(book.slug, page)) if book.include_reference_photo else None
     _, _, tw, th = _text_box(info, photo)
     fonts = fonts or load_fonts()
@@ -355,8 +372,19 @@ def _draw_owner_page(c: Canvas, book: Book, layout: Layout, fonts: Fonts) -> Non
     c.showPage()
 
 
+def _draw_template(c: Canvas, book: Book, page: Page, layout: Layout) -> None:
+    """The page's template, behind everything, embedded losslessly like line art."""
+    template = page_templates.for_page(book, page)
+    if template is None:
+        return
+    image_box, _ = page_templates.placement(book, template, layout.content)
+    art = page_templates.image(book, template, layout.content).convert("L")
+    draw_fitted(c, ImageReader(art), art.size, image_box)
+
+
 def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, fonts: Fonts) -> None:
-    art_box, info = layout.boxes(_shows_info(book, page))
+    _draw_template(c, book, page, layout)
+    art_box, info = layout.boxes(_shows_info(book, page), sheet_area(book, page, layout))
     draw_line_art(c, pages.selected_path(book.slug, page), art_box)
 
     if info:
@@ -389,6 +417,22 @@ def mosaic_of(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
     return grid, version.mosaic or mosaic.default_settings(book.age_group)
 
 
+MOSAIC_HEADING = 44  # points: the mosaic page's number and how to play, above the grid
+
+
+def mosaic_grid_box(book: Book) -> tuple[float, float, float, float]:
+    """Where a mosaic page puts its grid, in points: the cell size depends on it."""
+    x, y, w, h = _layout(book).content
+    legend_h = mosaic.legend_height(book.languages)
+    return x, y + legend_h + GAP, w, h - MOSAIC_HEADING - legend_h - 2 * GAP
+
+
+def mosaic_cell_mm(book: Book, rows: int, cols: int) -> float:
+    """Side of a mosaic cell as printed, in millimeters."""
+    _, _, w, h = mosaic_grid_box(book)
+    return min(w / cols, h / rows) / inch * 25.4
+
+
 def _draw_mosaic_sheet(
     c: Canvas, book: Book, grid: np.ndarray, settings: MosaicSettings, number: int, mystery: int, layout: Layout, fonts: Fonts
 ) -> None:
@@ -406,8 +450,7 @@ def _draw_mosaic_sheet(
     c.setFont(fonts.italic, 11)
     c.drawCentredString(x + w / 2, top - 36, extras.label("pdf.mosaic_hint", book))
     legend_h = mosaic.legend_height(book.languages)
-    grid_box = (x, y + legend_h + GAP, w, h - 44 - legend_h - 2 * GAP)
-    mosaic.draw_puzzle(c, grid, settings, grid_box, fonts.regular)
+    mosaic.draw_puzzle(c, grid, settings, mosaic_grid_box(book), fonts.regular)
     mosaic.draw_legend(c, settings, (x, y, w, legend_h), fonts, book.languages)
 
     if number:  # the workbench preview has none
@@ -512,6 +555,21 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
             c.showPage()
     c.save()
     return path
+
+
+def page_preview(book: Book, page: Page, dpi: int = 60) -> Image.Image:
+    """A coloring page as it will print, template included, for the workbench."""
+    layout = _layout(book)
+    fonts = load_fonts()
+    buffer = BytesIO()
+    c = Canvas(buffer, pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
+    _draw_sheet(c, book, page, 1, layout, fonts)
+    c.save()
+    pdf = pdfium.PdfDocument(buffer.getvalue())
+    try:
+        return pdf[0].render(scale=dpi / 72).to_pil().convert("RGB")
+    finally:
+        pdf.close()
 
 
 def mosaic_preview(book: Book, page: Page, grid: np.ndarray, settings: MosaicSettings, dpi: int = 100) -> Image.Image:

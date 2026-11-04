@@ -44,7 +44,9 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
 | `core/grouping.py` | Color grouping after the tone curve: mean shift (`pyrMeanShiftFiltering`) with one setting, the bandwidth (color radius); at most 1200 px, cached by what the photo was made from. |
 | `core/tones.py` | Tone curves for a page's photo, like GIMP's Curves: `lut` (control points joined by a monotone cubic, flat beyond the end points, which are the black and white points), `apply`, `histogram` for the editor, `PRESETS`. |
-| `core/mosaic.py` | Mystery mosaics, the third engine: `make_grid` (photo → tones per cell or triangle), `render_solution` (1-bit), and the vector drawing of the puzzle, its legend and the solution. Settings per age group, book or page (`settings_for`). |
+| `core/mosaic.py` | Mystery mosaics, the third engine: `make_grid` (photo → tones per cell or triangle, or one pen mark per cell), `render_solution` (1-bit), and the vector drawing of the puzzle, its legend and the solution. Settings per age group, book or page (`settings_for`). |
+| `core/background.py` | Background removal for mosaics, offline: IS-Net (ONNX Runtime, CPU), downloaded once into `models/` and checked against its SHA-256; `subject_mask` caches masks per crop in `masks/`. Same interface as the `SAM` branch's SAM2 version. |
+| `core/page_templates.py` | Page templates: the predefined designs (drawn as closed outlines at the page's proportions), uploads (1 bit, with their empty area found as the largest empty rectangle), and where the drawing goes inside each (`drawing_box`). |
 | `core/export.py` | `preflight` (what the PDF will contain, captions that overflow, extras the pages cannot make), `sheets` (every interior page in print order) and `export_book_pdf`. |
 | `core/extras.py` | The extra pages: color test, word search, maze, connect-the-dots, solutions, diploma, closing page. Generated, never drawn by the AI, seeded with the book id; `available` says which ones the pages can make. |
 | `core/captions.py` | Text from the text model: `translate` (a caption into the book's second language) and `suggest_listing` (the Amazon description, keywords, categories, reading age). |
@@ -69,12 +71,16 @@ books/<slug>/
   lineart/<page-id>/v<n>.png      1-bit cleaned coloring page
                                   (mosaic versions: v<n>-raw.png is the grid, v<n>.png the solution)
   cover_art/v<n>.jpg              front cover image, uploaded or drawn by the AI (RGB)
+  masks/<page-id>-<hash>.png      background-removal masks, per crop (a cache: safe to delete)
+  page_templates/<id>.png         page templates the author uploaded (1 bit)
   exports/<slug>-<timestamp>.pdf  one file per build, never overwritten
   exports/covers/<slug>-cover-<pages>p-<timestamp>.pdf
                                   KDP cover, sized for an interior of <pages> pages
   exports/marketing/<slug>-images-<timestamp>.zip
                                   listing images: mockup, look inside, front cover
 ```
+
+Downloaded models live in `models/` (git-ignored, bind-mounted, shared by every book).
 
 A page's status moves `pending → converted → approved`; a new version or switching versions puts
 it back to `converted`. The author can delete a version from the workbench, after a confirmation
@@ -136,6 +142,34 @@ stroked over the whole grid, clipped to the shapes of their tone; dots, dashes a
 dashed lines, whose dash restarts on each row, so shifting a row staggers them. `export.sheets` adds `mosaic_solutions:<i>`
 sheets (six per page, filled in, with number and title) after the activities, before the diploma
 and closing page. Mosaics are left out of the word search and the connect-the-dots.
+
+**One pen** (`fill="pen"`) always has six tones and square cells. Its tone mapping skips the
+equalization (white paper must stay white) and `_pen_grid` chooses each cell's mark by
+Floyd–Steinberg error diffusion (serpentine, `PEN_DIFFUSION` of the error passed on) on the ink
+each mark leaves, which `pen_ink` measures by drawing it, after a `PEN_GAMMA` curve that keeps
+mid-tones light. "\" and "/" leave the same ink; the structure tensor of each cell picks the one
+along its edge, and flat cells alternate. The puzzle shows faint dots at the cell corners instead
+of lines, and the legend and solution draw the marks as vectors.
+
+**Background removal** (`remove_background`): `background.subject_mask` cuts the subject out of the
+cropped photo (before the tone curve, so moving the curve never runs the model again), the grid
+is framed on the subject plus `SUBJECT_MARGIN`, the tones are spread over the subject only, and
+everything outside is white. The workbench shows the cut and, for every mosaic, the grid size,
+the printed cell size (`export.mosaic_cell_mm`, from the same box the PDF uses) and an estimate
+of the drawing time.
+
+### Page templates (`page_templates`)
+
+A coloring page's template is its own (`Page.page_template`, or `"none"`), else the book's
+(`Book.page_template`). The template is drawn first, losslessly like line art, and the drawing
+and its caption box go inside its area (`export.sheet_area`), shrunk by the page's
+`template_inset`; `caption_fits` measures the same box. Predefined designs are drawn with OpenCV
+as filled shapes whose contours become the lines, so every part is closed and can be colored; they
+are drawn at the content box's proportions, and both the shapes and their area are measured from
+the edges in units of the short side, so the clearance is the same on every page size. Uploads are
+thresholded (Otsu) to 1 bit, and their area is the largest empty rectangle (histogram method, on
+a 240-px copy) minus a small margin, adjustable in the export view. Mosaics and extra pages have
+no template.
 
 ### Cleanup (`lineart.clean`)
 
@@ -242,6 +276,7 @@ The app has no login: it is a single-user tool for one computer. What keeps it s
 |---|---|
 | Others on the network using the app (photos, Gemini credit) | Compose publishes the port on `127.0.0.1` only; `COLORIN_BIND` opens it on purpose. |
 | The API key leaking from the UI | The Settings field never receives the saved key; an empty field keeps it. |
+| A crafted model file | The background model is checked against a pinned SHA-256 before it is loaded or kept. |
 | A book ZIP from someone else reaching outside its folder | Names that become paths (`Book.slug`, `Page.id`, `Page.original`) must match the patterns in `schema.py`, and `books.inside` checks every page path stays in its book; archive entries outside the book layout are skipped, and their total size is capped. |
 | Text from a book (titles, captions) turning into markup | The UI escapes Markdown with `ui.common.plain`; every user string in the PDF goes through `escape` or `plain_markup`, since ReportLab paragraphs read tags like `<img src>`. |
 | Secrets in git or in the image | `config/.env` and the Compose override are git-ignored; `.dockerignore` keeps them and the user data out of the image. |
