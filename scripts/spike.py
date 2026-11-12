@@ -9,7 +9,9 @@ Writes ``<out>/<photo>/<style>-<age>-raw.png`` and ``-clean.png``, ``<out>/resul
 one contact sheet per photo, ``<out>/<photo>-sheet.jpg``. ``--jobs toucan:cartoon:3-5 ...`` runs
 only those conversions; ``--reclean`` re-runs ``lineart.clean`` on the raw files already in
 ``<out>`` without calling Gemini. ``--engine stable_diffusion`` draws with the Stable Diffusion
-server instead (``STABLE_DIFFUSION_URL``), one page at a time.
+server instead (``STABLE_DIFFUSION_URL``), and ``--engine local_gpu`` with the local GPU server
+(``LOCAL_IMAGE_URL``; start it with ``./launch.sh gpu`` and add ``--network host`` with
+``LOCAL_IMAGE_URL=http://127.0.0.1:8602`` when running the spike outside Compose), one page at a time.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.core import imaging, lineart, stable_diffusion, usage
+from app.core import imaging, lineart, local_image, stable_diffusion, usage
 
 # Scenes keep their setting; single subjects get a simplified one (the book default).
 BACKGROUNDS = {"las-lajas": "keep", "pigeons": "keep"}
@@ -40,6 +42,9 @@ def convert(photo: Path, style: str, age: str, out: Path, engine: str = "gemini"
         with usage.book_context("spike"):
             if engine == "stable_diffusion":
                 raw = stable_diffusion.edit_image(image, imaging.build_sd_prompt(style, age, background))
+            elif engine == "local_gpu":
+                prompt = imaging.build_local_prompt(style, age, background, TITLES.get(name, ""))
+                raw, _ = local_image.edit_image(image, prompt, imaging.aspect_for(*image.size))
             else:
                 prompt = imaging.build_prompt(style, age, background, TITLES.get(name, ""))
                 raw = imaging.render_coloring_page(photo.read_bytes(), image.size, prompt)
@@ -106,7 +111,7 @@ def main() -> None:
     parser.add_argument("--jobs", nargs="*", help="photo:style:age triples (default: every combination)")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--reclean", action="store_true")
-    parser.add_argument("--engine", choices=("gemini", "stable_diffusion"), default="gemini")
+    parser.add_argument("--engine", choices=("gemini", "local_gpu", "stable_diffusion"), default="gemini")
     args = parser.parse_args()
 
     photos = sorted(p for p in args.photos.glob("*.jpg") if not args.only or p.stem in args.only)
@@ -121,7 +126,7 @@ def main() -> None:
             photos = sorted({job[0] for job in jobs})
         else:
             jobs = [(p, s, a) for p in photos for s in args.styles for a in args.ages]
-        workers = 1 if args.engine == "stable_diffusion" else args.workers  # the server draws one at a time
+        workers = args.workers if args.engine == "gemini" else 1  # the GPU servers draw one at a time
         print(f"{len(jobs)} conversions, {workers} at a time")
         args.out.mkdir(parents=True, exist_ok=True)
         with ThreadPoolExecutor(workers) as pool:

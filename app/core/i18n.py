@@ -40,8 +40,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Turn your photos into a coloring book.",
     },
     "home.unconfigured": {
-        "es": "Ningún motor de IA está configurado: abre **⚙️ Ajustes** para usar Gemini o Stable Diffusion. Mientras tanto puedes usar el borrador gratis.",
-        "en": "No AI engine is configured yet: open **⚙️ Settings** to use Gemini or Stable Diffusion. Meanwhile you can use the free draft.",
+        "es": "Ningún motor de IA está configurado: abre **⚙️ Ajustes** para usar Gemini, la GPU local o Stable Diffusion. Mientras tanto puedes usar el borrador gratis.",
+        "en": "No AI engine is configured yet: open **⚙️ Settings** to use Gemini, the local GPU or Stable Diffusion. Meanwhile you can use the free draft.",
     },
     "home.new_book": {"es": "Nuevo libro", "en": "New book"},
     "home.title_placeholder": {"es": "p. ej. Aves del jardín", "en": "e.g. Garden birds"},
@@ -83,6 +83,38 @@ STRINGS: dict[str, dict[str, str]] = {
     "settings.title": {"es": "⚙️ Ajustes: motores de IA", "en": "⚙️ Settings: AI engines"},
     "settings.tab_gemini": {"es": "Gemini", "en": "Gemini"},
     "settings.tab_sd": {"es": "Stable Diffusion", "en": "Stable Diffusion"},
+    "settings.tab_local": {"es": "GPU local", "en": "Local GPU"},
+    "settings.local_help": {
+        "es": "Motor opcional que dibuja páginas para colorear con un modelo abierto (Qwen-Image-2.1) en la GPU NVIDIA de este equipo: sin coste por imagen y de 30 segundos a un minuto por página. `./launch.sh` lo arranca solo si la GPU lo permite (24 GB de VRAM o más). Los textos, traducciones y portadas siguen con Gemini. La licencia de Qwen-Image-2.1 es de investigación: no vendas páginas hechas con él sin un acuerdo comercial con su autor.",
+        "en": "Optional engine that draws coloring pages with an open model (Qwen-Image-2.1) on this computer's NVIDIA GPU: no cost per image and 30 seconds to a minute per page. `./launch.sh` starts it only when the GPU can run it (24 GB of VRAM or more). Texts, translations and covers stay on Gemini. Qwen-Image-2.1 has a research license: do not sell pages made with it without a commercial agreement with its author.",
+    },
+    "settings.local_url": {"es": "Dirección del servidor GPU", "en": "GPU server address"},
+    "settings.local_url_help": {
+        "es": "Como la ve la app: `http://local-image:8000` con Docker Compose, `http://localhost:8602` si la app corre sin Docker.",
+        "en": "As the app sees it: `http://local-image:8000` with Docker Compose, `http://localhost:8602` when the app runs without Docker.",
+    },
+    "settings.local_size": {"es": "Tamaño de página", "en": "Page size"},
+    "settings.local_size_1k": {"es": "1K, rápido (recomendado)", "en": "1K, fast (recommended)"},
+    "settings.local_size_2k": {"es": "2K, más fondo", "en": "2K, more background"},
+    "settings.local_size_help": {
+        "es": "1K tarda de 30 segundos a un minuto y da trazos más limpios. 2K, el tamaño propio del modelo, tarda unos 2 minutos y conserva más fondo en escenas llenas, pero sus líneas salen más cortadas.",
+        "en": "1K takes 30 seconds to a minute and gives cleaner strokes. 2K, the model's own size, takes about 2 minutes and keeps more background in busy scenes, but its lines come out more broken.",
+    },
+    "settings.local_unreachable": {
+        "es": "El servidor GPU local no responde en {url}. Arráncalo en este equipo con `./launch.sh gpu`.",
+        "en": "The local GPU server does not answer at {url}. Start it on this computer with `./launch.sh gpu`.",
+    },
+    "settings.local_ready": {"es": "Servidor GPU listo: {model} en {gpu}.", "en": "GPU server ready: {model} on {gpu}."},
+    "settings.local_loading": {"es": "El servidor GPU está cargando {model}…", "en": "The GPU server is loading {model}…"},
+    "settings.local_downloading": {
+        "es": "Descargando el modelo: {done} de {total} GB ({percent} %). Solo ocurre la primera vez.",
+        "en": "Downloading the model: {done} of {total} GB ({percent}%). This only happens the first time.",
+    },
+    "settings.local_error": {"es": "El servidor GPU no puede dibujar: {error}", "en": "The GPU server cannot draw: {error}"},
+    "settings.local_license": {
+        "es": "{model} tiene licencia de investigación: sirve para probar y para libros que no vas a vender.",
+        "en": "{model} has a research license: fine for trying things out and for books you will not sell.",
+    },
     "settings.sd_help": {
         "es": "Segundo motor opcional: un servidor propio de stable-diffusion.cpp (`sd-server`) con FLUX.1 Kontext. Solo dibuja páginas para colorear, más lento que Gemini (1–2 minutos cada una) y sin coste por imagen; los textos, traducciones y portadas siguen con Gemini. Revisa la licencia del modelo y las normas del servidor antes de vender páginas hechas con él. Déjalo vacío para no usarlo.",
         "en": "Optional second engine: your own stable-diffusion.cpp server (`sd-server`) with FLUX.1 Kontext. It only draws coloring pages, slower than Gemini (1–2 minutes each) and with no cost per image; texts, translations and covers stay on Gemini. Check the model's license and the server's rules before selling pages made with it. Leave it empty to turn it off.",
@@ -213,6 +245,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "status.converted": {"es": "🖍️ Convertida", "en": "🖍️ Converted"},
     "status.approved": {"es": "✅ Aprobada", "en": "✅ Approved"},
     "engine.gemini": {"es": "Gemini", "en": "Gemini"},
+    "engine.local_gpu": {"es": "GPU local", "en": "Local GPU"},
     "engine.stable_diffusion": {"es": "Stable Diffusion", "en": "Stable Diffusion"},
     "engine.draft": {"es": "Borrador", "en": "Draft"},
     "engine.mosaic": {"es": "Monocromo", "en": "Monochrome"},
@@ -312,8 +345,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.crop_reset": {"es": "✂️ Quitar recorte", "en": "✂️ Remove crop"},
     "wb.coloring_page": {"es": "Página para colorear", "en": "Coloring page"},
     "wb.not_converted": {
-        "es": "Aún no se ha convertido. Elige el estilo y pulsa **✨ Gemini** o **🖌️ Stable Diffusion**, o prueba el borrador gratis.",
-        "en": "Not converted yet. Pick the style and press **✨ Gemini** or **🖌️ Stable Diffusion**, or try the free draft.",
+        "es": "Aún no se ha convertido. Elige el estilo y pulsa **✨ Gemini**, **🖥️ GPU local** o **🖌️ Stable Diffusion**, o prueba el borrador gratis.",
+        "en": "Not converted yet. Pick the style and press **✨ Gemini**, **🖥️ Local GPU** or **🖌️ Stable Diffusion**, or try the free draft.",
     },
     "wb.versions": {"es": "Versiones", "en": "Versions"},
     "wb.version_label": {"es": "v{n} · {engine} · {style}", "en": "v{n} · {engine} · {style}"},
@@ -324,6 +357,19 @@ STRINGS: dict[str, dict[str, str]] = {
     "wb.instructions_placeholder": {"es": "p. ej. solo el ave, sin la rama", "en": "e.g. only the bird, not the branch"},
     "wb.convert": {"es": "✨ Gemini", "en": "✨ Gemini"},
     "wb.regenerate": {"es": "✨ Otra con Gemini", "en": "✨ Again with Gemini"},
+    "wb.local": {"es": "🖥️ GPU local", "en": "🖥️ Local GPU"},
+    "wb.local_help": {
+        "es": "Dibuja la página en la GPU de este equipo: de 30 segundos a un minuto, sin coste por imagen. Va mejor con sujetos claros que con escenas muy detalladas. Su licencia no permite vender lo que dibuja. No cambies de página mientras dibuja.",
+        "en": "Draws the page on this computer's GPU: 30 seconds to a minute, no cost per image. Works better with clear subjects than with very detailed scenes. Its license does not allow selling what it draws. Do not change pages while it draws.",
+    },
+    "wb.local_disabled": {
+        "es": "El servidor GPU local no está en marcha: arráncalo con `./launch.sh gpu` (necesita una GPU NVIDIA con 24 GB o más).",
+        "en": "The local GPU server is not running: start it with `./launch.sh gpu` (it needs an NVIDIA GPU with 24 GB or more).",
+    },
+    "wb.local_converting": {
+        "es": "Dibujando en la GPU local… (30 segundos a 2 minutos; no toques nada mientras tanto)",
+        "en": "Drawing on the local GPU… (30 seconds to 2 minutes; do not touch anything meanwhile)",
+    },
     "wb.sd": {"es": "🖌️ Stable Diffusion", "en": "🖌️ Stable Diffusion"},
     "wb.sd_help": {
         "es": "Dibuja la página con tu servidor de Stable Diffusion: 1–2 minutos, sin coste por imagen. Va mejor con un solo sujeto que con escenas llenas. No cambies de página mientras dibuja.",
@@ -535,6 +581,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "**{n} pages** in the book have no drawing yet.",
     },
     "pages.convert_all_ai": {"es": "✨ Todas con Gemini (≈ ${cost:.2f})", "en": "✨ All with Gemini (≈ ${cost:.2f})"},
+    "pages.convert_all_local": {"es": "🖥️ Todas en la GPU local (≈ {minutes} min)", "en": "🖥️ All on the local GPU (≈ {minutes} min)"},
+    "pages.convert_all_local_help": {
+        "es": "Una a la vez en la GPU de este equipo, sin coste por imagen. Deja la pestaña abierta y no toques nada hasta que termine.",
+        "en": "One at a time on this computer's GPU, no cost per image. Keep the tab open and do not touch anything until it finishes.",
+    },
     "pages.convert_all_sd": {"es": "🖌️ Todas con Stable Diffusion (≈ {minutes} min)", "en": "🖌️ All with Stable Diffusion (≈ {minutes} min)"},
     "pages.convert_all_sd_help": {
         "es": "Una a la vez en tu servidor, 1–2 minutos por página. Deja la pestaña abierta y no toques nada hasta que termine.",
@@ -738,6 +789,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "kdp.issue.photos_gray": {
         "es": "Con tinta negra las fotos de referencia se imprimen en escala de grises.",
         "en": "With black ink the reference photos print in grayscale.",
+    },
+    "kdp.issue.model_not_for_sale": {
+        "es": "Estas páginas se dibujaron en la GPU local con {models}, cuya licencia no permite vender lo que dibuja sin un acuerdo comercial: {names}. Vuelve a dibujarlas con Gemini o con otro motor antes de publicar.",
+        "en": "These pages were drawn on the local GPU with {models}, whose license does not allow selling what it draws without a commercial agreement: {names}. Redraw them with Gemini or another engine before publishing.",
     },
     "kdp.issue.ai_disclosure": {
         "es": "Hay imágenes hechas con IA (dibujos o la imagen de portada): al publicar, KDP te pregunta por contenido generado por IA y tienes que declararlas.",

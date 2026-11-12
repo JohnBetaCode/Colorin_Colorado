@@ -9,6 +9,8 @@ A single Streamlit process (`app/main.py`) renders the home page (`app/ui/home.p
 workspace (`app/ui/book.py`), which switches between four views: workbench, pages, export and
 Amazon KDP.
 Business logic lives in `app/core/` and never imports Streamlit; the UI calls it and renders.
+An optional second container, the local GPU server (`local_image/server.py`, Compose profile
+`gpu`), draws coloring pages on an NVIDIA GPU for the local GPU engine.
 
 ```
 app/ui/home.py ─────┐
@@ -17,6 +19,7 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
   pages_grid.py     │
   export_panel.py   ├──► app/core/imaging.py ──┬──► app/core/gemini.py ──► Gemini (Vertex AI or AI Studio)
   kdp_panel.py      │                          │         └──► app/core/usage.py (data/usage.jsonl)
+                    │                          ├──► app/core/local_image.py ──HTTP──► local_image/server.py (GPU, optional)
                     │                          ├──► app/core/stable_diffusion.py ──► your sd-server (optional)
                     │                          └──► app/core/lineart.py (clean, draft)
                     ├──► app/core/captions.py  (translations, Amazon listing) ──► gemini.py
@@ -35,12 +38,14 @@ app/ui/book.py ─────┼──► app/core/books.py     books/<slug>/bo
 |---|---|
 | `core/config.py` | Loads `config/.env`; `Settings` (including the auth method: `adc`, `vertex_key` or `studio_key`); `save_settings` merges new values into `.env` (keys not passed are kept). |
 | `core/gemini.py` | One cached `genai.Client` per location, created under a lock (concurrent first calls used to build throwaway clients that closed their connection when garbage-collected): Vertex AI with ADC and a project, Vertex AI with an API key, or the Gemini Developer API with an AI Studio key. `generate_image` takes reference images (JPEG/PNG/WebP sniffed), aspect ratio and size, returns the final image (not the low-resolution drafts the model thinks with, which come first, marked `thought`), and retries once when no image comes back. Every call records usage. |
-| `core/stable_diffusion.py` | The optional second image engine: a stable-diffusion.cpp server (`sd-server`, FLUX.1 Kontext) at `STABLE_DIFFUSION_URL`. `edit_image` shrinks the photo to `STABLE_DIFFUSION_SIZE` on its long side (multiples of 8), passes the steps inside the prompt (`<sd_cpp_extra_args>`), posts it to `/v1/images/edits` one call at a time (the server draws one image at a time), retries busy or restarting servers with backoff (15 min timeout) and records one image at no cost. `check_connection` reads `/sdcpp/v1/models/status`, which does not wake the model (`/v1/models` does). Only coloring pages use it: captions, translations and covers stay on Gemini. |
+| `core/local_image.py` | The optional local GPU engine: the `local-image` Compose service at `LOCAL_IMAGE_URL` (default `http://local-image:8000`). `edit_image` sends the cropped photo as a JPEG reference with the closest aspect ratio and `LOCAL_IMAGE_PAGE_SIZE` (`1k` or `2k`), one call at a time, and returns the PNG and the model id (from `X-Model`), recorded on the version; usage is logged as `<model>-local` at $0. `health` is cached for 15 s, failures included, so reruns stay fast when the service is not running; `available` enables the engine's buttons. `NON_COMMERCIAL_MODELS` feeds the KDP warning. Only coloring pages use it. |
+| `local_image/server.py` | FastAPI around the diffusers pipeline of Qwen-Image-2.1, in its own container with pinned dependencies. Lifecycle `checking → downloading → idle ⇄ loading → ready`, plus `unsupported` (too little VRAM) and `error`; unloads the model after `LOCAL_IMAGE_IDLE_MINUTES`; returns 507 on CUDA out of memory. Reads only the `LOCAL_IMAGE_*` keys of the read-only `config/.env`. The same server as Once Upon a Time's. |
+| `core/stable_diffusion.py` | The optional Stable Diffusion engine: a stable-diffusion.cpp server (`sd-server`, FLUX.1 Kontext) at `STABLE_DIFFUSION_URL`. `edit_image` shrinks the photo to `STABLE_DIFFUSION_SIZE` on its long side (multiples of 8), passes the steps inside the prompt (`<sd_cpp_extra_args>`), posts it to `/v1/images/edits` one call at a time (the server draws one image at a time), retries busy or restarting servers with backoff (15 min timeout) and records one image at no cost. `check_connection` reads `/sdcpp/v1/models/status`, which does not wake the model (`/v1/models` does). Only coloring pages use it: captions, translations and covers stay on Gemini. |
 | `core/usage.py` | One JSON line per call with input, output and thinking tokens and the estimated cost (`PRICING`; thinking tokens of image models at the text rate); `book_context(book_id)` attributes calls to a book; `summarize` and `breakdown` feed the usage panel and the sidebar. |
 | `core/schema.py` | Pydantic models `Book`, `Page`, `Version`, `Crop`, `CoverArt` and the option tuples (`STYLES`, `AGE_GROUPS`...). |
 | `core/books.py` | Book folders under `books/`, `book.json`, slugs (accents folded), create/list/delete, `duplicate_book`, and `export_zip`/`import_zip` (a book as a ZIP without its exports; imports become new books, and entries outside the book layout are ignored). |
 | `core/pages.py` | `pages.json`; photo ingestion (EXIF rotation, HEIC, 2048 px), crop, versions (`add_version`, `select_version`, `approve`), order, deletion, thumbnails. |
-| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt`, aspect ratio from the photo; Stable Diffusion's short English prompt (`SD_STYLE_PROMPTS`, `SD_AGE_PROMPTS`, `SD_BACKGROUND_PROMPTS`, `build_sd_prompt`); `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three Gemini calls at a time or one at a time for the other engines, stored from the calling thread). `AI_ERRORS` is what a failed AI conversion raises, whichever engine. |
+| `core/imaging.py` | Prompt pieces (`STYLE_PROMPTS`, `AGE_PROMPTS`, `BACKGROUND_PROMPTS`), `build_prompt` (Gemini, and the local GPU engine through `build_local_prompt`), aspect ratio from the photo; Stable Diffusion's short English prompt (`SD_STYLE_PROMPTS`, `SD_AGE_PROMPTS`, `SD_BACKGROUND_PROMPTS`, `build_sd_prompt`); `render_page` (run an engine and clean the result), `convert_page` (render and store as a new version) and `convert_pages` (many pages, three Gemini calls at a time or one at a time for the other engines, stored from the calling thread). `AI_ERRORS` is what a failed AI conversion raises, whichever engine. |
 | `core/lineart.py` | The black-and-white guarantee (`clean`) and the offline draft engine (`draft`). |
 | `core/grouping.py` | Color grouping after the tone curve: mean shift (`pyrMeanShiftFiltering`) with one setting, the bandwidth (color radius); at most 1200 px, cached by what the photo was made from. |
 | `core/tones.py` | Tone curves for a page's photo, like GIMP's Curves: `lut` (control points joined by a monotone cubic, flat beyond the end points, which are the black and white points), `apply`, `histogram` for the editor, `PRESETS`. |
@@ -106,12 +111,15 @@ id, not slug, because a deleted book's slug can be reused.
 2. **AI engine**: build the prompt from the style, the age group, the background, the page title
    (it names the subject) and the author's instructions; send the photo as the reference image
    with the closest supported aspect ratio (`3:4`, `1:1`, `4:3`) at `2K` (1792 × 2400 for `3:4`).
+   The local GPU engine sends the same prompt and aspect ratio at `LOCAL_IMAGE_PAGE_SIZE` (1K by
+   default, 896 × 1184 for `3:4`) and records the model on the version; Stable Diffusion gets its
+   short prompt at `STABLE_DIFFUSION_SIZE`.
    **Draft engine**: mean shift + k-means flatten the photo into a few color areas and their
    borders become the lines, so every area is closed. Free, deterministic, and not a drawing.
 3. `lineart.clean` the result and store raw + clean as the next version, selected.
 
-`convert_pages` runs step 1–2 for many pages in a thread pool (three AI calls at a time; the
-draft engine one at a time) and stores each result from the calling thread as it arrives, so
+`convert_pages` runs step 1–2 for many pages in a thread pool (three Gemini calls at a time; the
+other engines one at a time) and stores each result from the calling thread as it arrives, so
 `pages.json` is never written by two threads. `usage.book_context` is process-wide, so it is set
 once around the pool.
 
@@ -280,6 +288,7 @@ The app has no login: it is a single-user tool for one computer. What keeps it s
 | A book ZIP from someone else reaching outside its folder | Names that become paths (`Book.slug`, `Page.id`, `Page.original`) must match the patterns in `schema.py`, and `books.inside` checks every page path stays in its book; archive entries outside the book layout are skipped, and their total size is capped. |
 | Text from a book (titles, captions) turning into markup | The UI escapes Markdown with `ui.common.plain`; every user string in the PDF goes through `escape` or `plain_markup`, since ReportLab paragraphs read tags like `<img src>`. |
 | Secrets in git or in the image | `config/.env` and the Compose override are git-ignored; `.dockerignore` keeps them and the user data out of the image. |
+| The local GPU server (no authentication) | It listens on `127.0.0.1:8602` only; the app reaches it on the Compose network. It mounts `config/` read-only and reads only the `LOCAL_IMAGE_*` keys, so the API key never enters its environment. |
 | Vulnerable dependencies | Pinned versions, audited with `pip-audit` on 2026-10-31 (none known); Dependabot proposes updates for pip, Docker and the dev container. |
 
 Not covered: the photos and captions sent to Gemini are processed by Google under the terms of the
@@ -294,6 +303,7 @@ chosen access (Vertex AI or AI Studio).
 | Blank backs in phase 3 | In the MVP | One `showPage()` per sheet. |
 | No print-on-demand in v1 | Amazon KDP files and checks | Selling the books on Amazon became a goal; see [amazon-kdp.md](amazon-kdp.md). |
 | Never draw from text | Cover art may be drawn from text | The front cover is a color illustration, not a coloring page. |
+| Gemini, or the draft engine as fallback | Also a local GPU engine and Stable Diffusion | No cost per page for authors with a GPU or a server; both reuse the cleanup. |
 | Vertex AI with ADC only | ADC or an API key | Not everyone has a Google Cloud project. |
 | Convert all pending in phase 2 | Done, with three AI calls at a time | Converting a 50-page book one by one took too long. |
 | More styles and templates in phase 3 | Kawaii, mandala, an adult level, and four kinds of book | Asked for after the MVP. |

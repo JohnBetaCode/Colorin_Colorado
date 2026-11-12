@@ -15,17 +15,19 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 
-from app.core import background, gemini, lineart, mosaic, pages, stable_diffusion, usage
+from app.core import background, gemini, lineart, local_image, mosaic, pages, stable_diffusion, usage
 from app.core.books import now
+from app.core.config import get_settings
 from app.core.schema import Book, Engine, MosaicSettings, Page, Version
 
 # What a failed AI conversion raises, whichever engine drew it.
-AI_ERRORS = (gemini.GeminiError, stable_diffusion.StableDiffusionError)
+AI_ERRORS = (gemini.GeminiError, local_image.LocalImageError, stable_diffusion.StableDiffusionError)
 # What a conversion can raise: the AI's errors, or a mosaic's background that cannot be removed.
 CONVERSION_ERRORS = (*AI_ERRORS, background.BackgroundError)
 
 AI_PAGE_COST_USD = 0.14  # estimate shown before converting many pages at once
 SD_PAGE_MINUTES = 1.5  # Stable Diffusion, one page at a time: estimate shown before converting many
+LOCAL_PAGE_MINUTES = {"1k": 0.7, "2k": 1.9}  # local GPU (RTX 5090), one page at a time, by page size
 BATCH_WORKERS = 3  # Gemini conversions running at the same time in convert_pages
 
 STYLE_PROMPTS = {
@@ -173,6 +175,21 @@ def build_sd_prompt(style: str, age_group: str, background: str, instructions: s
 _ASPECTS = {"3:4": 3 / 4, "1:1": 1.0, "4:3": 4 / 3}
 
 
+def build_local_prompt(style: str, age_group: str, background: str, title: str = "", instructions: str = "") -> str:
+    """The local GPU engine's instruction: the Gemini prompt as it is.
+
+    Qwen-Image-2.1 reads long instructions through its Qwen3-VL encoder, so unlike Stable
+    Diffusion it needs no short prompt of its own; neither a short prompt nor an extra "solid
+    black lines" rule did better on real photos (docs/spike.md, "Local GPU").
+    """
+    return build_prompt(style, age_group, background, title, instructions)
+
+
+def local_page_minutes() -> float:
+    """Estimated minutes per page on the local GPU at the configured page size."""
+    return LOCAL_PAGE_MINUTES[get_settings().local_size]
+
+
 def aspect_for(width: int, height: int) -> str:
     """Closest supported aspect ratio to the photo's, so the framing survives."""
     ratio = width / height
@@ -236,10 +253,15 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
         )
         return Rendered(page, mosaic.grid_png(grid), version, mosaic.render_solution(grid, settings))
     photo = pages.cropped_photo(book.slug, page)
+    model: str | None = None  # recorded for the local GPU engine, whose model's license matters
     if engine == "gemini":
         prompt = build_prompt(style, book.age_group, background, page.title, page.instructions)
         with usage.book_context(book.id):
             raw = render_coloring_page(pages.jpeg_bytes(photo), photo.size, prompt)
+    elif engine == "local_gpu":
+        prompt = build_local_prompt(style, book.age_group, background, page.title, page.instructions)
+        with usage.book_context(book.id):
+            raw, model = local_image.edit_image(photo, prompt, aspect_for(*photo.size))
     elif engine == "stable_diffusion":
         prompt = build_sd_prompt(style, book.age_group, background, page.instructions)
         with usage.book_context(book.id):
@@ -257,6 +279,7 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
         curve=page.curve,
         group=page.group,
         warnings=cleaned.warnings,
+        model=model,
         created_at=now(),
     )
     return Rendered(page, raw, version, cleaned.image)
@@ -269,8 +292,9 @@ def _store(book: Book, rendered: Rendered) -> Page:
 def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = None) -> Page:
     """Convert a page's (cropped) photo and store the result as its new selected version.
 
-    ``engine`` is ``"gemini"`` (AI, paid), ``"stable_diffusion"`` (AI on the author's own
-    server, slow), ``"draft"`` (offline, free) or ``"mosaic"`` (a mystery mosaic, offline, free).
+    ``engine`` is ``"gemini"`` (AI, paid), ``"local_gpu"`` (AI on this machine's GPU, free, slow),
+    ``"stable_diffusion"`` (AI on the author's own server, slow), ``"draft"`` (offline, free) or
+    ``"mosaic"`` (a mystery mosaic, offline, free).
     With ``replace``, that version is deleted once the new one is stored: versions are never
     overwritten, so the replacement gets the next number.
     Raises one of ``CONVERSION_ERRORS`` when the AI call fails or a mosaic's background cannot be
@@ -285,7 +309,8 @@ def convert_page(book: Book, page: Page, engine: Engine, replace: int | None = N
 def convert_pages(
     book: Book, page_list: list[Page], engine: Engine, on_done: Callable[[int, Page, str | None], None] | None = None
 ) -> list[tuple[Page, str]]:
-    """Convert several pages, ``BATCH_WORKERS`` Gemini calls at a time; returns the failures.
+    """Convert several pages, ``BATCH_WORKERS`` Gemini calls at a time (the other engines one at
+    a time); returns the failures.
 
     Every result is stored from the calling thread as soon as it arrives, so ``pages.json``
     is never written by two threads. ``on_done(count, page, error)`` reports each page.

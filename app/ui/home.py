@@ -4,8 +4,16 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.core import books, gemini, i18n, pages, stable_diffusion, templates, usage
-from app.core.config import AUTH_METHODS, LANGUAGES, SD_SIZE_RANGE, SD_STEPS_RANGE, get_settings, save_settings
+from app.core import books, gemini, i18n, local_image, pages, stable_diffusion, templates, usage
+from app.core.config import (
+    AUTH_METHODS,
+    LANGUAGES,
+    LOCAL_PAGE_SIZES,
+    SD_SIZE_RANGE,
+    SD_STEPS_RANGE,
+    get_settings,
+    save_settings,
+)
 from app.core.i18n import LANGUAGE_NAMES, t
 from app.core.schema import AGE_GROUPS, STYLES, TEMPLATES
 from app.ui.common import flash, language_switch, plain, seed, show_flash
@@ -101,12 +109,60 @@ def _render_sd_settings() -> None:
                 st.error(t("settings.failed", error=exc))
 
 
+def _render_local_status(fresh: bool = False) -> None:
+    """The local GPU server's state, in the UI language."""
+    url = get_settings().local_url
+    try:
+        info = local_image.health(max_age=0 if fresh else 15)
+    except local_image.LocalImageError:
+        st.warning(t("settings.local_unreachable", url=url))
+        return
+    status = info.get("status")
+    model, gpu = info.get("model") or "?", info.get("gpu") or "GPU"
+    if status in ("ready", "idle"):
+        st.success(t("settings.local_ready", model=model, gpu=gpu))
+    elif status == "downloading" and info.get("progress"):
+        progress = info["progress"]
+        st.info(t("settings.local_downloading", done=progress.get("downloaded_gb", 0),
+                  total=progress.get("total_gb", 0), percent=progress.get("percent") or 0))
+    elif status in ("checking", "loading", "downloading"):
+        st.info(t("settings.local_loading", model=model))
+    else:
+        st.error(t("settings.local_error", error=info.get("error") or status))
+    if local_image.is_non_commercial(info.get("model")):
+        st.caption(t("settings.local_license", model=model))
+
+
+def _render_local_settings() -> None:
+    settings = get_settings()
+    seed("settings_local_url", settings.local_url)
+    seed("settings_local_size", settings.local_size)
+    st.caption(t("settings.local_help"))
+    with st.form("local_settings_form"):
+        col1, col2 = st.columns([2, 1])
+        url = col1.text_input(t("settings.local_url"), help=t("settings.local_url_help"), key="settings_local_url")
+        size = col2.selectbox(
+            t("settings.local_size"), LOCAL_PAGE_SIZES, format_func=lambda s: t(f"settings.local_size_{s}"),
+            help=t("settings.local_size_help"), key="settings_local_size",
+        )
+        save_col, test_col, _ = st.columns([1, 1, 3])
+        saved = save_col.form_submit_button(t("settings.save"), type="primary")
+        tested = test_col.form_submit_button(t("settings.save_test"))
+    if saved or tested:
+        save_settings({"LOCAL_IMAGE_URL": url.strip().rstrip("/"), "LOCAL_IMAGE_PAGE_SIZE": size})
+        st.success(t("settings.saved"))
+    _render_local_status(fresh=bool(tested))
+
+
 def _render_settings_panel() -> None:
     settings = get_settings()
-    with st.expander(t("settings.title"), expanded=not (settings.configured or settings.sd_configured)):
-        gemini_tab, sd_tab = st.tabs([t("settings.tab_gemini"), t("settings.tab_sd")])
+    any_engine = settings.configured or settings.sd_configured or local_image.available()
+    with st.expander(t("settings.title"), expanded=not any_engine):
+        gemini_tab, local_tab, sd_tab = st.tabs([t("settings.tab_gemini"), t("settings.tab_local"), t("settings.tab_sd")])
         with gemini_tab:
             _render_gemini_settings()
+        with local_tab:
+            _render_local_settings()
         with sd_tab:
             _render_sd_settings()
 
@@ -148,7 +204,7 @@ def _open_book(slug: str) -> None:
 def _render_create_form() -> None:
     st.subheader(t("home.new_book"))
     settings = get_settings()
-    if not (settings.configured or settings.sd_configured):
+    if not (settings.configured or settings.sd_configured or local_image.available()):
         st.info(t("home.unconfigured"))
     with st.form("create_book", clear_on_submit=True):
         title = st.text_input(t("book.title"), placeholder=t("home.title_placeholder"))

@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# Start Colorín Colorado with Docker Compose.
+#
+#   ./launch.sh              start the app, plus the local GPU engine when this machine can run it
+#   ./launch.sh cloud        start the app only (Gemini, Stable Diffusion and the free engines)
+#   ./launch.sh gpu          start the app and the local GPU engine (explains why when it cannot)
+#   ./launch.sh status       containers, health, local GPU server state and the address
+#   ./launch.sh stop         stop everything (books, settings and downloaded models are kept)
+#   ./launch.sh logs [app|gpu]
+#
+# Needs Docker with the Compose plugin. The local GPU engine needs an NVIDIA GPU with at least
+# 24 GB of VRAM (32 GB recommended), the NVIDIA Container Toolkit, about 40 GB of RAM and about
+# 45 GB of free disk for the first download. The app only listens on this computer; start it
+# with COLORIN_BIND=0.0.0.0 ./launch.sh to open it from other devices. See docs/setup.md.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+APP_URL="http://localhost:8502"
+GPU_URL="http://127.0.0.1:8602"
+MIN_VRAM_GB=24
+MIN_RAM_GB=40
+MIN_DISK_GB=45
+ADC_FILE="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}/application_default_credentials.json"
+export UID GID="${GID:-$(id -g)}"  # docker-compose.yml runs the app as you, so books/ stays yours
+
+if [ -t 1 ]; then B=$'\e[1m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; N=$'\e[0m'; else B=""; G=""; Y=""; R=""; N=""; fi
+ok()   { echo "${G}✓${N} $*"; }
+warn() { echo "${Y}!${N} $*"; }
+fail() { echo "${R}✗${N} $*" >&2; exit 1; }
+
+need_docker() {
+  command -v docker >/dev/null || fail "Docker is not installed: https://docs.docker.com/get-docker/"
+  docker compose version >/dev/null 2>&1 || fail "The Docker Compose plugin is missing: https://docs.docker.com/compose/install/"
+  docker info >/dev/null 2>&1 || fail "Cannot talk to the Docker daemon (is it running, and is your user in the docker group?)"
+}
+
+setting() {  # setting KEY: its value in config/.env, if any
+  sed -n "s/^$1=//p" config/.env 2>/dev/null | tail -1
+}
+
+check_gemini() {
+  local auth
+  auth=$(setting GEMINI_AUTH); auth=${auth:-adc}
+  if [ "$auth" != "adc" ]; then
+    if [ -n "$(setting GEMINI_API_KEY)" ]; then ok "Gemini: API key set"; else warn "Gemini: no API key yet; add it in Settings"; fi
+    return
+  fi
+  if [ -s "$ADC_FILE" ]; then
+    if [ ! -f docker-compose.override.yml ]; then
+      cp docker-compose.override.example.yml docker-compose.override.yml
+      ok "Created docker-compose.override.yml to mount your gcloud credentials"
+    fi
+    ok "Gemini: Google credentials found"
+  else
+    warn "Gemini: no Google credentials. Run gcloud auth application-default login, or use an API key in Settings."
+    warn "Without Gemini the app still converts pages on the local GPU, with Stable Diffusion or with the free engines."
+  fi
+}
+
+# Prints why the local GPU engine cannot run here; prints nothing when it can.
+gpu_reason() {
+  command -v nvidia-smi >/dev/null || { echo "no NVIDIA driver found (nvidia-smi is missing)"; return; }
+  local mib
+  mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | sort -n | tail -1 | tr -d ' ')
+  [ -n "$mib" ] || { echo "nvidia-smi does not report a GPU"; return; }
+  if [ $((mib / 1024)) -lt "$MIN_VRAM_GB" ]; then
+    echo "the GPU has $((mib / 1024)) GB of VRAM and the model needs at least $MIN_VRAM_GB GB"; return
+  fi
+  if ! docker info 2>/dev/null | grep -qiE 'nvidia'; then
+    echo "Docker cannot use the GPU: install the NVIDIA Container Toolkit and restart Docker"; return
+  fi
+}
+
+weights_volume() {  # the Docker volume holding the model weights, as Compose names it
+  echo "$(docker compose config 2>/dev/null | sed -n 's/^name: //p' | head -1)_local-image-models"
+}
+
+gpu_warnings() {
+  local ram_gb free_gb root
+  ram_gb=$(awk '/MemTotal/ {printf "%d", $2 / 1048576}' /proc/meminfo 2>/dev/null || echo 0)
+  if [ "${ram_gb:-0}" -gt 0 ] && [ "$ram_gb" -lt "$MIN_RAM_GB" ]; then
+    warn "This machine has ${ram_gb} GB of RAM; the model holds about 25 GB while loaded (${MIN_RAM_GB} GB recommended)"
+  fi
+  if ! docker volume inspect "$(weights_volume)" >/dev/null 2>&1; then
+    root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)
+    free_gb=$(df -BG --output=avail "$root" 2>/dev/null | tail -1 | tr -dc '0-9')
+    if [ -n "$free_gb" ] && [ "$free_gb" -lt "$MIN_DISK_GB" ]; then
+      warn "Only ${free_gb} GB free under $root; the first start downloads about 33 GB of weights plus a ~10 GB image"
+    fi
+  fi
+}
+
+json_field() {  # json_field <json> <key>: crude extractor for flat string/number fields
+  sed -n "s/.*\"$2\":\"\{0,1\}\([^,\"}]*\)\"\{0,1\}[,}].*/\1/p" <<<"$1" | head -1
+}
+
+app_health() {
+  curl -s -o /dev/null --max-time 3 -w '%{http_code}' "$APP_URL/_stcore/health" 2>/dev/null || true
+}
+
+gpu_status_line() {
+  local body status
+  body=$(curl -s --max-time 3 "$GPU_URL/health" 2>/dev/null || true)
+  if [ -z "$body" ]; then echo "not running"; return; fi
+  status=$(json_field "$body" status)
+  case "$status" in
+    downloading) echo "downloading the model weights: $(json_field "$body" downloaded_gb) of $(json_field "$body" total_gb) GB ($(json_field "$body" percent)%)";;
+    ready|idle)  echo "ready ($(json_field "$body" model) on $(json_field "$body" gpu))";;
+    unsupported|error) echo "$status: $(json_field "$body" error)";;
+    *) echo "$status";;
+  esac
+}
+
+print_urls() {
+  echo
+  echo "${B}Open the app:${N} $APP_URL"
+  if [ "${COLORIN_BIND:-127.0.0.1}" = "0.0.0.0" ]; then
+    local ips
+    if command -v ip >/dev/null; then
+      ips=$(ip -4 -o addr show scope global 2>/dev/null | awk '$2 !~ /^(docker|br-|veth|virbr)/ {split($4, a, "/"); print a[1]}')
+    else
+      ips=$(hostname -I 2>/dev/null || true)
+    fi
+    for ip in $ips; do echo "  from other devices: http://$ip:8502"; done
+  else
+    echo "  Only this computer can open it; COLORIN_BIND=0.0.0.0 ./launch.sh opens it to your network."
+  fi
+}
+
+wait_for_app() {
+  for _ in $(seq 1 60); do
+    [ "$(app_health)" = "200" ] && return 0
+    sleep 1
+  done
+  return 1
+}
+
+start() {
+  local mode="$1" reason=""
+  need_docker
+  check_gemini
+  if [ "$mode" = "auto" ] || [ "$mode" = "gpu" ]; then
+    reason=$(gpu_reason)
+    if [ -z "$reason" ]; then
+      ok "NVIDIA GPU can run the local image model"
+      gpu_warnings
+      mode="gpu"
+    elif [ "$mode" = "gpu" ]; then
+      fail "The local GPU engine cannot run here: $reason"
+    else
+      echo "  Local GPU engine skipped: $reason."
+      mode="cloud"
+    fi
+  fi
+
+  if [ "$mode" = "gpu" ]; then
+    echo "Starting the app and the local GPU engine (the first build takes a few minutes)..."
+    docker compose --profile gpu up -d --build
+  else
+    echo "Starting the app..."
+    docker compose up -d --build app
+  fi
+
+  if wait_for_app; then ok "App is up"; else warn "The app did not answer yet; check ./launch.sh logs app"; fi
+  print_urls
+
+  if [ "$mode" = "gpu" ]; then
+    for _ in $(seq 1 60); do  # wait until the server is past its start-up checks
+      case "$(gpu_status_line)" in "not running"|checking*) sleep 1 ;; *) break ;; esac
+    done
+    echo
+    echo "${B}Local GPU engine:${N} $(gpu_status_line)"
+    if [[ "$(gpu_status_line)" == downloading* ]]; then
+      echo "  The first start downloads ~33 GB once; follow it with ./launch.sh status"
+    fi
+    echo "  The 🖥️ Local GPU button in the workbench works as soon as the server is ready."
+  fi
+}
+
+case "${1:-auto}" in
+  auto|"") start auto ;;
+  cloud)   start cloud ;;
+  gpu)     start gpu ;;
+  status)
+    need_docker
+    docker compose --profile gpu ps
+    echo
+    if [ "$(app_health)" = "200" ]; then ok "App: $APP_URL"; else warn "App: not responding at $APP_URL"; fi
+    echo "Local GPU engine: $(gpu_status_line)"
+    ;;
+  stop)
+    need_docker
+    docker compose --profile gpu down
+    ok "Stopped. Books, settings and downloaded models are kept."
+    ;;
+  logs)
+    need_docker
+    case "${2:-app}" in
+      gpu|local-image) docker compose --profile gpu logs --tail 100 -f local-image ;;
+      *) docker compose logs --tail 100 -f app ;;
+    esac
+    ;;
+  -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

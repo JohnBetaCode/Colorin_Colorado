@@ -27,3 +27,33 @@ services:
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
       - STREAMLIT_CLIENT_TOOLBAR_MODE=minimal
     restart: unless-stopped
+
+  # Local GPU engine (optional): Qwen-Image-2.1 on an NVIDIA GPU. Started by `./launch.sh` when a
+  # capable GPU is present, or with: docker compose --profile gpu up -d
+  # The first start downloads ~33 GB of weights into the local-image-models volume. Settings
+  # (LOCAL_IMAGE_*) come from config/.env; see docs/setup.md.
+  local-image:
+    build: ./local_image
+    container_name: colorin-colorado-local-image
+    profiles: ["gpu"]
+    ports:
+      # Loopback only: the server has no authentication. The app reaches it through the
+      # compose network at http://local-image:8000.
+      - "127.0.0.1:8602:8000"
+    volumes:
+      - local-image-models:/models
+      # The server reads only the LOCAL_IMAGE_* keys of config/.env, never the API key.
+      - ./config:/config:ro
+    environment:
+      - LOCAL_IMAGE_CONFIG=/config/.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  local-image-models:

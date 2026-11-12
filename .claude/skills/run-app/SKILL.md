@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Start, stop, rebuild, test, inspect or debug the Colorín Colorado Streamlit app (Docker Compose on port 8502). Use this whenever the user wants to run the app, see it working, run the tests, check logs, restart after a code change, rebuild after changing requirements.txt or the Dockerfile, or asks why the UI is not loading, why a change does not show up, or why Gemini conversions fail.
+description: Start, stop, rebuild, test, inspect or debug the Colorín Colorado Streamlit app (Docker Compose on port 8502) and its optional local GPU engine server (port 8602). Use this whenever the user wants to run the app, see it working, run the tests, check logs, restart after a code change, rebuild after changing requirements.txt or the Dockerfile, or asks why the UI is not loading, why a change does not show up, or why Gemini conversions fail.
 ---
 
 # Run the app
@@ -19,6 +19,13 @@ the host user so `books/` and `data/` stay owned by them. Bind mounts:
 
 Only `requirements.txt` and the `Dockerfile` need a rebuild.
 
+An optional second service, `local-image` (container `colorin-colorado-local-image`, Compose
+profile `gpu`), serves Qwen-Image-2.1 on the NVIDIA GPU at `127.0.0.1:8602` for the **🖥️ Local
+GPU** engine. Its weights (~33 GB) live in the `local-image-models` volume; it mounts `config/`
+read-only and reads only the `LOCAL_IMAGE_*` keys. `./launch.sh` at the repo root checks Docker,
+the Gemini credentials and the GPU, creates the Compose override when gcloud credentials exist,
+and starts the GPU server only when the machine can run it (`./launch.sh status | stop | logs gpu`).
+
 ## Commands
 
 ```bash
@@ -29,8 +36,15 @@ Only `requirements.txt` and the `Dockerfile` need a rebuild.
                                                  # for a snapshot: docker compose logs --tail 200 app
 .claude/skills/run-app/scripts/app.sh restart    # after config/.env changes, or edits made with no tab open
 .claude/skills/run-app/scripts/app.sh rebuild    # after requirements.txt / Dockerfile changes
+.claude/skills/run-app/scripts/app.sh gpu        # start/rebuild the local GPU engine's server
+.claude/skills/run-app/scripts/app.sh gpu-logs   # its logs: download progress, loads, pages
 .claude/skills/run-app/scripts/app.sh down
 ```
+
+`curl -s 127.0.0.1:8602/health` gives the GPU server's `status` (`checking`, `downloading` with
+`progress`, `idle`, `loading`, `ready`, `unsupported`, `error`) and the reason in `message`. An
+HTTP 507 from `/generate` is a CUDA out-of-memory: another process holds VRAM (`nvidia-smi`), for
+example Once Upon a Time's GPU server while it draws.
 
 The UI is http://localhost:8502; health is `GET /_stcore/health`.
 

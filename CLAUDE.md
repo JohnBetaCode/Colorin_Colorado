@@ -16,6 +16,11 @@ name a country or city (the author's own books can be about anything).
 - Business logic goes in `app/core/` and never imports Streamlit; `app/ui/` only calls it and renders.
 - Every Gemini call goes through `app/core/gemini.py` and records usage; wrap book work in
   `usage.book_context(book.id)` (by id, not slug).
+- The local GPU engine (`local_gpu`) calls `app/core/local_image.py`, which talks HTTP to
+  `local_image/server.py` (its own container, Compose profile `gpu`, pinned torch and diffusers);
+  nothing under `app/` imports torch or diffusers. It reuses Gemini's prompt (`build_local_prompt`)
+  and records the model on each version: Qwen-Image-2.1's license forbids selling its pages, and
+  `kdp.review` warns about them (`local_image.NON_COMMERCIAL_MODELS`).
 - Every coloring page an engine returns goes through `lineart.clean` before it is stored or shown.
   Coloring pages are 1-bit; never JPEG-encode line art anywhere (the PDF embeds it losslessly).
   Mystery mosaics (`mosaic.py`) are the one exception: the grid is stored as data
@@ -28,7 +33,11 @@ name a country or city (the author's own books can be about anything).
   AI, and seeded with the book id. The text model (`captions.py`) only translates or describes what
   the book contains; never ask it for facts.
 - Per-age settings live in several dicts (`lineart`, `imaging.AGE_PROMPTS`, `imaging.SD_AGE_PROMPTS`, `extras`, `mosaic`); a new age
-  group or style needs an entry in each, and a check on real photos recorded in `docs/spike.md`.
+  group or style needs an entry in each, and a check on real photos recorded in `docs/spike.md`
+  (Gemini, and the local GPU engine, which shares its prompt).
+- A new engine needs an entry in `schema.ENGINES` (and `AI_ENGINES` when an AI draws), an
+  `engine.<id>` label in both languages, a branch in `imaging.render_page`, its error in
+  `imaging.AI_ERRORS`, buttons in the workbench and in **Convert all**, and a spike section.
 - Versions are append-only (`pages.add_version`, `cover_art`); never overwrite `v<n>.png` or
   `cover_art/v<n>.jpg`. A page version is deleted only when the author asks
   (`pages.delete_version`), and its number is never reused (`Page.last_version`).
@@ -48,7 +57,10 @@ name a country or city (the author's own books can be about anything).
   any new name that becomes part of a path needs a pattern in `schema.py` and a `books.inside`
   check; user text goes through `ui.common.plain` in Markdown and `escape` in ReportLab.
 - When changing a model id (`GEMINI_*`), update `config/.env.example`, the defaults in
-  `app/core/config.py`, `PRICING` in `app/core/usage.py`, and the table in `docs/setup.md`.
+  `app/core/config.py`, `PRICING` in `app/core/usage.py`, and the table in `docs/setup.md`. For the
+  local model (`LOCAL_IMAGE_MODEL`): the default in `local_image/server.py`, the commented line in
+  `config/.env.example`, the server table in `docs/setup.md`, `<model>-local` at $0 in `PRICING`,
+  and `local_image.NON_COMMERCIAL_MODELS` when its license does not allow selling.
 - Amazon KDP numbers (sizes, page ranges, costs, royalties) live in `app/core/kdp.py`, with their
   sources in `docs/amazon-kdp.md`; change them together, and `tests/test_kdp.py`. The interior PDF
   must keep every font embedded and line art at 300 ppi or more.
@@ -58,6 +70,8 @@ name a country or city (the author's own books can be about anything).
 
 ## Running
 
+`./launch.sh` starts everything and adds the local GPU engine's server (Compose profile `gpu`,
+`127.0.0.1:8602`) when the GPU can run it; `./launch.sh status` shows both. The dev loop is
 `docker compose up -d` (port 8502) with `app/`, `tests/` and `scripts/` bind-mounted. Streamlit and
 OpenCV are not installed on the host; run tests in the container:
 

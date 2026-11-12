@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
-from app.core import books, commons, imaging, pages
+from app.core import books, commons, imaging, local_image, pages
 from app.core.config import get_settings
 from app.core.i18n import t
 from app.core.schema import Book, Page
@@ -160,7 +160,8 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
     with st.container(border=True):
         st.markdown(t("pages.convert_all_title", n=len(pending)))
         settings = get_settings()
-        col1, col2, col3, col4 = st.columns(4)
+        local_ready = local_image.available()
+        col1, col_local, col2 = st.columns(3)  # AI engines
         if col1.button(
             t("pages.convert_all_ai", cost=len(pending) * imaging.AI_PAGE_COST_USD),
             type="primary",
@@ -169,6 +170,13 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
             width="stretch",
         ):
             _convert_all(book, pending, "gemini")
+        if col_local.button(
+            t("pages.convert_all_local", minutes=round(len(pending) * imaging.local_page_minutes())),
+            disabled=not local_ready,
+            help=t("pages.convert_all_local_help") if local_ready else t("wb.local_disabled"),
+            width="stretch",
+        ):
+            _convert_all(book, pending, "local_gpu")
         if col2.button(
             t("pages.convert_all_sd", minutes=round(len(pending) * imaging.SD_PAGE_MINUTES)),
             disabled=not settings.sd_configured,
@@ -176,6 +184,7 @@ def _render_convert_all(book: Book, page_list: list[Page]) -> None:
             width="stretch",
         ):
             _convert_all(book, pending, "stable_diffusion")
+        col3, col4 = st.columns(2)  # without AI
         if col3.button(t("pages.convert_all_draft"), help=t("wb.draft_help"), width="stretch"):
             _convert_all(book, pending, "draft")
         if col4.button(t("pages.convert_all_mosaic"), help=t("wb.mosaic_help"), width="stretch"):
