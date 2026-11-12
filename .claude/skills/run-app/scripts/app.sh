@@ -73,8 +73,8 @@ case "${1:-status}" in
     docker compose --profile gpu down
     ;;
   gpu)
-    docker compose --profile gpu up -d --build local-image
-    health
+    # launch.sh creates the shared weights volume where LOCAL_IMAGE_MODELS_DIR says
+    exec "$ROOT/launch.sh" gpu
     ;;
   gpu-logs)
     docker compose --profile gpu logs --tail "${2:-100}" -f local-image

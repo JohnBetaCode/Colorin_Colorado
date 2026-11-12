@@ -21,7 +21,9 @@ Only `requirements.txt` and the `Dockerfile` need a rebuild.
 
 An optional second service, `local-image` (container `colorin-colorado-local-image`, Compose
 profile `gpu`), serves Qwen-Image-2.1 on the NVIDIA GPU at `127.0.0.1:8602` for the **🖥️ Local
-GPU** engine. Its weights (~33 GB) live in the `local-image-models` volume; it mounts `config/`
+GPU** engine. Its weights (~33 GB) live in the shared, external `local-image-models` volume (Once Upon a Time's
+GPU server mounts it too; `launch.sh` and `app.sh gpu` create it, on the folder in `LOCAL_IMAGE_MODELS_DIR` when set;
+`./launch.sh status` prints where the weights are); it mounts `config/`
 read-only and reads only the `LOCAL_IMAGE_*` keys. `./launch.sh` at the repo root checks Docker,
 the Gemini credentials and the GPU, creates the Compose override when gcloud credentials exist,
 and starts the GPU server only when the machine can run it (`./launch.sh status | stop | logs gpu`).

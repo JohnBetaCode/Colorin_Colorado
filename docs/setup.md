@@ -48,8 +48,8 @@ in `config/.env` (copied from `config/.env.example`).
 | `./launch.sh logs [app\|gpu]` | Follow the logs of the app or of the GPU server |
 
 The plain Compose equivalents are `docker compose up -d --build` (after copying the override
-when you use gcloud credentials) and `docker compose --profile gpu up -d --build` with the GPU
-engine.
+when you use gcloud credentials) and, with the GPU engine, `docker volume create
+local-image-models` (once) and `docker compose --profile gpu up -d --build`.
 
 Open http://localhost:8502. Once Upon a Time uses port 8501, so both can run at the same time.
 
@@ -83,8 +83,8 @@ was drawn with it.
 **Start it.** `./launch.sh` starts it automatically when the requirements are met; `./launch.sh gpu`
 insists and tells you what is missing. The first start builds the server image and downloads the
 33 GB of weights once, a few minutes on a fast connection; `./launch.sh status` and
-**⚙️ Settings → Local GPU** show the progress. The weights survive rebuilds in the
-`local-image-models` Docker volume.
+**⚙️ Settings → Local GPU** show the progress. The weights survive rebuilds and are shared with
+Once Upon a Time's GPU server; see [where the models live](#where-the-models-live) below.
 
 **Use it.** In the workbench, **🖥️ Local GPU** converts the page; **Convert all** has the same
 option. The button is enabled while the server is ready. On an RTX 5090:
@@ -99,7 +99,35 @@ detailed scenes; [the spike](spike.md#local-gpu-2026-11-12) has the comparison. 
 minutes the server unloads the model to free its RAM, and the next page loads it again.
 
 Once Upon a Time ships the same server on port 8600; Colorín Colorado's listens on
-`127.0.0.1:8602`, so both can run, though two loaded models need about 50 GB of RAM.
+`127.0.0.1:8602`, so both can run and they share the downloaded weights, though two loaded
+models need about 50 GB of RAM.
+
+### Where the models live
+
+The weights go in one Docker volume, `local-image-models`, shared by
+every project that runs this server (Once Upon a Time and Colorín Colorado), so each model
+downloads once per computer. By default Docker keeps it in its own storage
+(`/var/lib/docker/volumes/local-image-models` on Linux). To keep the models in a folder of your
+choice, on another disk or somewhere you back up, set `LOCAL_IMAGE_MODELS_DIR` in `config/.env`
+(or in your environment) before the first `./launch.sh`; the launcher creates the volume on that
+folder. The first project that creates the volume decides where it lives, so set the same value in
+every project; if they disagree, `launch.sh` says where the weights really are. `./launch.sh status`
+shows the location. The volume is external to Compose, so `docker compose down -v` never deletes it.
+
+To move weights you already downloaded into a folder:
+
+```bash
+./launch.sh stop                                    # in every project that runs the GPU server
+mkdir -p /data/models
+docker run --rm -v local-image-models:/src -v /data/models:/dst alpine cp -a /src/. /dst/
+docker volume rm local-image-models
+echo "LOCAL_IMAGE_MODELS_DIR=/data/models" >> config/.env   # in every project
+./launch.sh gpu
+```
+
+The server runs as root in its container, so the files it writes in that folder belong to root.
+To free the space, stop every GPU server, run `docker volume rm local-image-models`, and delete the
+folder if you set one.
 
 ## Branches
 
@@ -155,6 +183,7 @@ container). Restart it after changing them: `docker compose --profile gpu up -d 
 | `LOCAL_IMAGE_CFG` | `1.0` | Guidance; above 1 enables a negative prompt at ~1.6x the time (the app sends none). |
 | `LOCAL_IMAGE_OFFLOAD` | `model` | `none` keeps the whole model on the GPU (needs ~40 GB of VRAM). |
 | `LOCAL_IMAGE_MIN_VRAM_GB` | `24` | The server refuses to start on GPUs with less VRAM. |
+| `LOCAL_IMAGE_MODELS_DIR` | Docker's storage | Folder for the shared weights; read by `launch.sh` when it creates the `local-image-models` volume. Same value in every project. |
 
 The saved API key is never sent to the browser: the Settings field stays empty, shows the key's last
 four characters, and keeps the saved key unless you type a new one (**Forget the saved API key**

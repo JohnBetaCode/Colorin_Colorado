@@ -71,7 +71,9 @@ name a country or city (the author's own books can be about anything).
 ## Running
 
 `./launch.sh` starts everything and adds the local GPU engine's server (Compose profile `gpu`,
-`127.0.0.1:8602`) when the GPU can run it; `./launch.sh status` shows both. The dev loop is
+`127.0.0.1:8602`) when the GPU can run it; `./launch.sh status` shows both. Its model weights live in the
+shared external volume `local-image-models` (also Once Upon a Time's), created by `launch.sh` on
+`LOCAL_IMAGE_MODELS_DIR` when set. The dev loop is
 `docker compose up -d` (port 8502) with `app/`, `tests/` and `scripts/` bind-mounted. Streamlit and
 OpenCV are not installed on the host; run tests in the container:
 
