@@ -100,6 +100,48 @@ What it does:
 
 Not checked yet: `remove` background, mandala, adults, and sizes other than 768 px.
 
+## Local GPU (2026-11-12)
+
+A third AI engine for coloring pages (`local_image.py`): [Qwen-Image-2.1](https://huggingface.co/Qwen/Qwen-Image-2.1),
+an open model that takes the photo as a reference image, on the author's own NVIDIA GPU through
+the bundled server (`local_image/server.py`). Checked on all five photos above on an RTX 5090, one
+page at a time with a fixed seed, against Gemini's pages from the first round; 19 conversions in
+all, no cost per image. The last three ran through `scripts/spike.py --engine local_gpu` and the
+app's own server.
+
+**Prompt.** Its text encoder is a vision-language model (Qwen3-VL), so it was given both the
+Gemini prompt and Stable Diffusion's short one. They did about equally well; the Gemini prompt
+follows "simplify the background" better (the toucan gets a trunk and a ground line, not every
+branch) and carries the title and the author's instructions, so `build_local_prompt` is
+`build_prompt` unchanged. A third variant that added "draw every line as a solid pure black
+stroke, never a pencil sketch" changed nothing visible.
+
+![Gemini and the local GPU at 1K and 2K: toucan realistic 6–8, boy cartoon 3–5, pigeons realistic 6–8](images/local-gpu.jpg)
+
+What it does:
+
+- **Clear subjects are its strength.** The toucan, the boy for 3–5 and the two dogs come out
+  faithful and clean: every page drawn with the Gemini prompt passed `lineart.clean` with no
+  warnings. The boy is as good as Gemini's.
+- **Detailed scenes lose detail in the cleanup, not in the drawing.** The raw Las Lajas page has
+  the whole valley, but in thin gray pencil-like lines; `lineart.clean` keeps only the darkest, so
+  the page is the sanctuary and its bridge with little around them, where Gemini's keeps the
+  vegetation. Darkening the raw page first (levels with the white point at 230 or 200) made it
+  worse: fewer areas and `too_few_regions` warnings. The crowded pigeons keep the girl and every
+  bird, but at 1K lose the stairs.
+- **1K or 2K.** At its native 2K (about 105 s a page instead of 30–60 s) the pigeons keep their
+  stairs, but strokes come out more broken, the toucan's outline in pieces, and Las Lajas is no
+  better. 1K is the default (`LOCAL_IMAGE_PAGE_SIZE`).
+- **Speed.** About 30 s a page at 1K once the weights are in memory, 40–55 s for the first pages
+  after the model loads, and 105–110 s at 2K; peak VRAM 18–21 GB with the model offloaded to RAM
+  between steps.
+
+**License.** Qwen-Image-2.1 is under the Qwen Research License, for research and evaluation:
+its pages are for trying styles and for books that will not be sold. Each version records the
+model, and the KDP view warns about selected pages drawn with it.
+
+Not checked yet: kawaii, mandala, adults, the `remove` background, and Qwen-Image-2.1-Turbo.
+
 ## Still open
 
 - **Small subjects.** When the subject fills a small part of the photo (the dogs), the model keeps

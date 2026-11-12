@@ -17,7 +17,7 @@ Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
 Marketplace = Literal["us", "uk", "es"]
 Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
-Engine = Literal["gemini", "stable_diffusion", "draft", "mosaic"]
+Engine = Literal["gemini", "local_gpu", "stable_diffusion", "draft", "mosaic"]
 # Mystery mosaics (mosaic.py): how each number is filled in (pencil tones or a palette of pen
 # patterns), and whether cells are whole squares or split along a diagonal into two triangles.
 MosaicFill = Literal["tones", "classic", "lines", "stipple", "geometric", "pen"]  # pen: one mark per cell
@@ -47,8 +47,8 @@ BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
-ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion", "draft", "mosaic")
-AI_ENGINES: tuple[Engine, ...] = ("gemini", "stable_diffusion")  # drawn by an AI: declared to Amazon KDP
+ENGINES: tuple[Engine, ...] = ("gemini", "local_gpu", "stable_diffusion", "draft", "mosaic")
+AI_ENGINES: tuple[Engine, ...] = ("gemini", "local_gpu", "stable_diffusion")  # drawn by an AI: declared to Amazon KDP
 MOSAIC_FILLS: tuple[MosaicFill, ...] = ("tones", "classic", "lines", "stipple", "geometric", "pen")
 MOSAIC_CELLS: tuple[MosaicCells, ...] = ("square", "diagonal")
 STATUSES: tuple[Status, ...] = ("pending", "converted", "approved")
@@ -196,6 +196,7 @@ class Version(BaseModel):
     group: int | None = None  # and its color grouping bandwidth
     warnings: list[str] = Field(default_factory=list)
     mosaic: MosaicSettings | None = None  # what a mosaic version was made with
+    model: str | None = None  # the local GPU engine's model id (its license matters for selling)
     created_at: str
 
 

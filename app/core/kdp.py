@@ -15,9 +15,16 @@ from typing import Literal
 
 from PIL import Image
 
-from app.core import cover_art, export
+from app.core import cover_art, export, local_image
 from app.core.schema import (
-    AI_ENGINES, LICENSES_NOT_FOR_SALE, LICENSES_WITH_CREDIT, Book, Ink, Marketplace, Page, PageSize
+    AI_ENGINES,
+    LICENSES_NOT_FOR_SALE,
+    LICENSES_WITH_CREDIT,
+    Book,
+    Ink,
+    Marketplace,
+    Page,
+    PageSize,
 )
 
 TRIM: dict[PageSize, tuple[float, float]] = {  # inches; all of them are "large" trims for printing cost
@@ -153,6 +160,14 @@ def _uses_ai(page: Page) -> bool:
     return any(v.n == page.selected and v.engine in AI_ENGINES for v in page.versions)
 
 
+def _non_commercial_model(page: Page) -> str | None:
+    """The model of the page's selected version when its license does not allow selling it."""
+    for v in page.versions:
+        if v.n == page.selected and v.engine == "local_gpu" and local_image.is_non_commercial(v.model):
+            return v.model
+    return None
+
+
 def review(book: Book) -> Review:
     report = export.preflight(book)
     pages = len(export.sheets(book, report.included))
@@ -211,6 +226,10 @@ def review(book: Book) -> Review:
         add("info", "photos_gray")
     if any(_uses_ai(p) for p in report.included) or (art_path and art.source != "upload"):
         add("info", "ai_disclosure")
+    restricted = [p for p in report.included if _non_commercial_model(p)]
+    if restricted:
+        models = sorted({_non_commercial_model(p) for p in restricted})
+        add("warning", "model_not_for_sale", names=_names(restricted), models=", ".join(models))
 
     return Review(
         pages=pages,

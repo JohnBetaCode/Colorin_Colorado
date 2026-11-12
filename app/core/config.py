@@ -11,8 +11,12 @@ Authentication (``GEMINI_AUTH``) is one of:
   - ``vertex_key``: Vertex AI with an API key (``GEMINI_API_KEY``), no project needed.
   - ``studio_key``: the Gemini Developer API with a Google AI Studio key (``GEMINI_API_KEY``).
 
-Stable Diffusion (``STABLE_DIFFUSION_URL``) is the second, optional image engine: a
-stable-diffusion.cpp server on the author's own network. It only draws coloring pages;
+The local GPU engine (``LOCAL_IMAGE_URL``) draws coloring pages with an open-weights model on
+this machine's NVIDIA GPU: the ``local-image`` Compose service, started by ``./launch.sh`` when the
+GPU can run it. Its own settings (``LOCAL_IMAGE_*``) are read by that service.
+
+Stable Diffusion (``STABLE_DIFFUSION_URL``) is another optional image engine: a
+stable-diffusion.cpp server on the author's own network. Both only draw coloring pages;
 texts and covers stay on Gemini.
 """
 
@@ -32,6 +36,7 @@ LANGUAGES = ("es", "en")
 AUTH_METHODS = ("adc", "vertex_key", "studio_key")
 SD_STEPS_RANGE = (4, 30)  # sampling steps: 8-12 is about as good as the server's 20, twice as fast
 SD_SIZE_RANGE = (512, 1024)  # long side sent to the server, in pixels; time grows with the area
+LOCAL_PAGE_SIZES = ("1k", "2k")  # local GPU output; 1k is faster with cleaner strokes (docs/spike.md)
 
 load_dotenv(ENV_FILE)
 
@@ -49,6 +54,8 @@ class Settings:
     sd_url: str = ""
     sd_steps: int = 12
     sd_size: int = 768
+    local_url: str = "http://local-image:8000"
+    local_size: str = "1k"
 
     @property
     def configured(self) -> bool:
@@ -67,6 +74,11 @@ def _int(name: str, default: int, bounds: tuple[int, int]) -> int:
     return max(bounds[0], min(bounds[1], value))
 
 
+def _choice(name: str, default: str, options: tuple[str, ...]) -> str:
+    value = os.environ.get(name, "").strip().lower()
+    return value if value in options else default
+
+
 def get_settings() -> Settings:
     language = os.environ.get("UI_LANGUAGE", "es")
     auth = os.environ.get("GEMINI_AUTH", "adc")
@@ -82,6 +94,8 @@ def get_settings() -> Settings:
         sd_url=os.environ.get("STABLE_DIFFUSION_URL", "").strip().rstrip("/"),
         sd_steps=_int("STABLE_DIFFUSION_STEPS", 12, SD_STEPS_RANGE),
         sd_size=_int("STABLE_DIFFUSION_SIZE", 768, SD_SIZE_RANGE),
+        local_url=(os.environ.get("LOCAL_IMAGE_URL", "").strip() or "http://local-image:8000").rstrip("/"),
+        local_size=_choice("LOCAL_IMAGE_PAGE_SIZE", "1k", LOCAL_PAGE_SIZES),
     )
 
 

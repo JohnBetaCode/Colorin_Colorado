@@ -6,3 +6,5 @@ models/
 spike/
 .git/
 **/__pycache__/
+# The GPU server has its own image (local_image/Dockerfile).
+local_image/

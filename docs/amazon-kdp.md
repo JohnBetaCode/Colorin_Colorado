@@ -158,7 +158,7 @@ substantially**, including interior and cover images. In this app:
 
 | Content | AI-generated for KDP? |
 |---|---|
-| Pages converted with **✨ Gemini** or **🖌️ Stable Diffusion** | **Yes** |
+| Pages converted with **✨ Gemini**, **🖥️ Local GPU** or **🖌️ Stable Diffusion** | **Yes** |
 | Pages from the **✏️ Free draft** (OpenCV, no AI) | No |
 | Captions, back cover text and copyright text you typed | No |
 | AI caption suggestions (phase 2), if used as written | Yes (text) |
@@ -167,6 +167,12 @@ substantially**, including interior and cover images. In this app:
 
 AI-*assisted* content (you made it and used AI to edit or check it) does not need declaring. The
 KDP view reminds you when any selected page, or the cover image, came from the AI.
+
+**Model licenses.** Besides declaring AI content, you need the right to sell what the model drew.
+The local GPU engine's default model, Qwen-Image-2.1, is under the Qwen Research License (research
+and evaluation only), so its pages cannot be sold without a commercial agreement with Alibaba;
+every version records its model and the KDP view warns about each selected page drawn with it. FLUX.1 Kontext [dev], the usual Stable
+Diffusion model, is under a non-commercial license too: check it before selling those pages.
 
 **Quality.** KDP removes content that is "typically disappointing to customers". For coloring
 books that means drawings with AI mistakes (extra legs, broken shapes, garbled details), blurry or

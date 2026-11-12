@@ -8,16 +8,24 @@
 #   app.sh restart   - restart the container (config/.env changes, or code edited with no tab open)
 #   app.sh down      - stop and remove the container
 #   app.sh logs [N]  - last N log lines (default 100), then follow
+#   app.sh gpu       - start (build if needed) the local GPU engine's server (Compose profile "gpu")
+#   app.sh gpu-logs [N] - follow the GPU server's logs (download progress, loads, pages)
+#
+# For a full start with GPU detection, use ./launch.sh at the repo root.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 cd "$ROOT"
 URL="http://localhost:8502"
+GPU_URL="http://127.0.0.1:8602"
 
 health() {
   local code
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL/_stcore/health" || true)
   if [ "$code" = "200" ]; then echo "HTTP health: OK ($URL)"; else echo "HTTP health: not responding (code: ${code:-none})"; fi
+  local gpu
+  gpu=$(curl -s --max-time 3 "$GPU_URL/health" || true)
+  if [ -n "$gpu" ]; then echo "Local GPU server: $gpu"; else echo "Local GPU server: not running (optional; app.sh gpu)"; fi
 }
 
 # Google Cloud credentials are mounted by docker-compose.override.yml (git-ignored). Create it
@@ -39,7 +47,7 @@ wait_healthy() {
 
 case "${1:-status}" in
   status)
-    docker compose ps 2>/dev/null || true
+    docker compose --profile gpu ps 2>/dev/null || true
     health
     ;;
   up)
@@ -62,13 +70,20 @@ case "${1:-status}" in
     wait_healthy
     ;;
   down)
-    docker compose down
+    docker compose --profile gpu down
+    ;;
+  gpu)
+    docker compose --profile gpu up -d --build local-image
+    health
+    ;;
+  gpu-logs)
+    docker compose --profile gpu logs --tail "${2:-100}" -f local-image
     ;;
   logs)
     docker compose logs --tail "${2:-100}" -f app
     ;;
   *)
-    sed -n '2,10p' "$0"
+    sed -n '2,15p' "$0"
     exit 1
     ;;
 esac

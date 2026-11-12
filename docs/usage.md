@@ -10,12 +10,16 @@
    order you uploaded them. Or paste a **Wikimedia Commons** link: the photo comes with its
    author, license and link already filled in.
 3. **Convert**. In **🗂️ Pages**, **✨ All with Gemini** draws every page that has no drawing
-   yet, three at a time, with the estimated cost on the button; **🖌️ All with Stable Diffusion**
-   does it on your own server, one at a time, with the estimated minutes (**✏️ Free draft of all**
-   does it for free). Or go page by page in the **🎨 Workbench**:
+   yet, three at a time, with the estimated cost on the button; **🖥️ All on the local GPU** and
+   **🖌️ All with Stable Diffusion** do it on this computer's GPU or on your own server, one at a
+   time, with the estimated minutes (**✏️ Free draft of all** does it for free). Or go page by page in the **🎨 Workbench**:
    - **Crop** the photo first if the subject is small in it. The model keeps the photo's framing,
      so a dog in a corner of a lawn becomes a page full of grass.
-   - **✨ Gemini** takes 30–40 seconds and costs about $0.14. **🖌️ Stable Diffusion** (when set
+   - **✨ Gemini** takes 30–40 seconds and costs about $0.14. **🖥️ Local GPU** (when this computer
+     has a capable NVIDIA GPU, see [setup](setup.md#local-gpu-engine)) takes 30–60 seconds and
+     costs nothing per image; it does well with clear subjects such as a bird, a face or a pet, and
+     loses fine detail in very busy scenes. Its model has a research license, so use it to try
+     things out or for books you will not sell. **🖌️ Stable Diffusion** (when set
      up) takes 1–2 minutes on your own server and costs nothing per image; it does well with one
      subject and simple pages for small children, less so with crowded scenes, and it tends to
      keep the photo's background. Do not touch the app while it draws. **✏️ Free draft** is

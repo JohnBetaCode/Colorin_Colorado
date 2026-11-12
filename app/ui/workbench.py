@@ -20,6 +20,7 @@ from app.core import (
     gemini,
     grouping,
     imaging,
+    local_image,
     mosaic,
     page_templates,
     pages,
@@ -371,8 +372,8 @@ def _render_mosaic_tabs(book: Book, page: Page, draft: bool) -> None:
 
 def _convert(book: Book, page: Page, engine: Engine, replace: int | None = None) -> None:
     spinner = {
-        "gemini": "wb.converting", "stable_diffusion": "wb.sd_converting", "draft": "wb.drafting",
-        "mosaic": "wb.mosaic_drawing",
+        "gemini": "wb.converting", "local_gpu": "wb.local_converting", "stable_diffusion": "wb.sd_converting",
+        "draft": "wb.drafting", "mosaic": "wb.mosaic_drawing",
     }[engine]
     with st.spinner(t(spinner)):
         try:
@@ -696,8 +697,10 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
     _render_mosaic_options(book, page)
 
     settings = get_settings()
-    col1, col2 = st.columns(2)  # AI engines, then the free ones without AI
-    if col1.button(
+    local_ready = local_image.available()
+    # Gemini on its own row, the other AI engines below it, then the free ones without AI: three
+    # buttons in one row of this column truncate their labels.
+    if st.button(
         t("wb.regenerate") if page.versions else t("wb.convert"),
         type="primary",
         width="stretch",
@@ -706,6 +709,15 @@ def _render_coloring_page(book: Book, page: Page, next_id: str | None) -> None:
         key=f"convert_{page.id}",
     ):
         _convert(book, page, "gemini")
+    col_local, col2 = st.columns(2)
+    if col_local.button(
+        t("wb.local"),
+        width="stretch",
+        disabled=not local_ready,
+        help=t("wb.local_help") if local_ready else t("wb.local_disabled"),
+        key=f"local_{page.id}",
+    ):
+        _convert(book, page, "local_gpu")
     if col2.button(
         t("wb.sd"),
         width="stretch",
