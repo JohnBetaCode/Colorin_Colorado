@@ -102,10 +102,11 @@ both languages. Check the translations before printing.
 | Option | Default | What it does |
 |---|---|---|
 | Page size | Letter | Letter (*carta*), A4, 8 × 10 in or square 8.5 × 8.5 in. |
+| Page layout | Photo and text under the drawing | **Facing pages** puts the photo, large, and the caption on the left-hand page and the drawing alone on the right-hand page, like an open book. Every drawing is a right-hand page; a blank page is added where needed to keep it so. |
 | Cover | First page | Which coloring page goes on the title page, which is the cover when you print at home (also from **🗂️ Pages → Use as cover**). The KDP cover uses it too when it has no cover image. |
 | Reference photo on every page | On | The small color photo in the info box. |
 | "This book belongs to" page | On | A page for the child's name after the cover. |
-| Blank back on every sheet | Off | For double-sided printing, so markers never bleed into another drawing. Turn it on for Amazon. |
+| Blank back on every sheet | Off | For double-sided printing, so markers never bleed into another drawing. Turn it on for Amazon. With facing pages it applies to the other pages only: the back of each drawing is the next photo. |
 | Extra pages | None | See below. |
 | Copyright page | Empty | Text for the page behind the title page (© year and author, rights, ISBN), printed with the photo credits. With no text and no credits there is no copyright page. |
 
@@ -128,6 +129,11 @@ extra page adds two pages to the book.
 The fixed labels of the PDF follow the **book language**, not the app language: a Spanish app can
 make an English book. Pages without a coloring page are skipped; pages not yet approved are
 included and listed in the summary. Every build is a new file in `books/<slug>/exports/`.
+
+**🖨️ Print-shop PDF** (at the bottom of the export view) builds the same interior with a 0.125 in
+(3 mm) white bleed and crop marks around every page, and the trim and bleed boxes set, for a print
+shop or copy center. Its file ends in `-print-shop.pdf`. Do not upload it to Amazon KDP, which
+rejects crop marks: KDP takes the normal PDF.
 
 ## Page templates
 

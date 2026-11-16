@@ -209,6 +209,19 @@ the caption. Caption text shrinks in steps until it fits, otherwise it is clippe
 (`preflight` lists those pages). Optional blank back after every sheet, so every drawing is a
 right-hand page.
 
+With `Book.layout == "facing"`, each coloring page is preceded by a `PhotoSheet`, the left-hand
+page with the photo (up to 2400 px, about 300 ppi on the page) and the caption, centered as one
+block, the caption in up to a third of the page; the drawing has the right-hand page to itself, with
+no info box. `sheets` inserts a blank page wherever a drawing would otherwise land on a left-hand
+(even) page; mystery mosaics have no photo page and are right-hand pages too. Blank backs do not
+apply to these spreads.
+
+`export_book_pdf(print_shop=True)` adds, around every page, a white bleed (`PRINT_BLEED`, 0.125 in)
+and outside it the crop marks (`PRINT_SLUG`), with ReportLab's `cropMarks` and `bleedWidth=0`:
+nothing is scaled, so line art keeps its pixels and its 300 ppi. The trim and bleed boxes are set.
+Nothing in the interior reaches the edge of the page, so the bleed stays white. The file is
+`<slug>-<timestamp>-print-shop.pdf`; `export.is_print_shop` tells it apart from the KDP interior.
+
 Line art is embedded as 8-bit grayscale with lossless compression, so it stays pure 0/255. Where it
 would print below 300 ppi (a full-page drawing), it is upsampled with Lanczos and thresholded again,
 which keeps curves smooth and pixels pure. Photos are bounded JPEGs. Every font is embedded: the
@@ -301,6 +314,7 @@ chosen access (Vertex AI or AI Studio).
 | Draft engine: bilateral filter + adaptive threshold | Color-area segmentation | Edge detectors left loose strokes with no closed areas to color. |
 | Crop in phase 2 | Crop in the MVP workbench | The spike showed small subjects stay small; cropping is the fix. |
 | Blank backs in phase 3 | In the MVP | One `showPage()` per sheet. |
+| Facing pages: left page photo and caption, right page drawing | As planned, `Book.layout` | Blank pages keep every drawing on the right. |
 | No print-on-demand in v1 | Amazon KDP files and checks | Selling the books on Amazon became a goal; see [amazon-kdp.md](amazon-kdp.md). |
 | Never draw from text | Cover art may be drawn from text | The front cover is a color illustration, not a coloring page. |
 | Gemini, or the draft engine as fallback | Also a local GPU engine and Stable Diffusion | No cost per page for authors with a GPU or a server; both reuse the cleanup. |

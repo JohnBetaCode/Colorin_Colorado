@@ -171,7 +171,7 @@ Pydantic models (`core/schema.py`):
 
 Versions are never overwritten; regenerating adds `v2`, `v3`... and selects the newest.
 
-As built, `Book` has no `layout` yet (facing pages are phase 3) and has a default `background`;
+As built, `Book` has a default `background` (and, since 2026-11-16, `layout`: `bottom_box | facing`);
 the page's version is `Page.selected`; `Version` keeps its `background` and `instructions` but no
 prompt hash or file names (they follow from `n`); and the *New book* form asks for title, subtitle,
 style, age group and language only (dedication is in ✏️ Edit book, page size in 📄 Export PDF). After the MVP, `Book` gained the copyright page text
@@ -211,8 +211,8 @@ photos are re-encoded as bounded JPEGs to keep the file small.
    warns before building. A page with no caption and no photo gives the line art the whole sheet.
 4. **Blank backs** (optional): a blank page after each coloring page, so the book can be printed
    double-sided (as KDP always does) without markers bleeding into another drawing.
-5. **Facing pages** (phase 3): left page shows the large color photo and the caption, right page
-   the coloring page, for duplex printing and binding.
+5. **Facing pages** (`Book.layout`, done 2026-11-16): left page shows the large color photo and
+   the caption, right page the coloring page, for duplex printing and binding.
 
 Fixed labels ("Este libro pertenece a" / "This book belongs to") follow the book `language`.
 
@@ -254,19 +254,20 @@ attributed to its book, as in Once Upon a Time.
 
 **Phase 2**
 
-- AI caption suggestions (translations and the Amazon listing shipped; suggesting facts did not).
+- AI caption suggestions: translations and the Amazon listing shipped; suggesting facts will not
+  (see "AI text only from what is there" under Decisions).
 - ~~**Convert all pending** with a progress bar~~: done 2026-10-31, three AI calls at a time.
 - ZIP of the PNG pages; delete single versions. (A ZIP of the whole book shipped instead.)
-- `screenshots` and `usage-report` skills.
+- ~~`screenshots` and `usage-report` skills~~: done 2026-11-16.
 
 (Home thumbnails, the usage panel and the README sample pages shipped in phase 1.)
 
 **Phase 3**
 
-- Facing-pages layout (blank backs shipped in phase 1).
+- ~~Facing-pages layout~~: done 2026-11-16 (blank backs shipped in phase 1).
 - ~~More styles (`kawaii`, `mandala`)~~: done 2026-10-31, with an adult level.
 - ~~Book templates with predefined caption fields~~: done 2026-10-31 (nature, landmarks, family).
-- Print-shop export: bleed and crop marks.
+- ~~Print-shop export: bleed and crop marks~~: done 2026-11-16, a separate PDF (KDP rejects marks).
 
 **After the MVP (2026-10-31)**
 
@@ -297,8 +298,23 @@ attributed to its book, as in Once Upon a Time.
 
 Checked on 2026-10-30 by the test suite (pure black and white in the exported PDF, labels in both
 languages, captions that do not fit are reported and clipped to the box) and by a Playwright run
-through the UI with three photos, one AI conversion included. A full 10-photo book has not been
-run end to end yet.
+through the UI with three photos, one AI conversion included.
+
+**2026-11-16, full run.** A 10-photo book went through the UI end to end with Playwright: five
+photos uploaded and five added from Wikimedia Commons (credits and licenses filled in), all
+converted on the local GPU engine (about 31 s a page), a caption typed and approved on each page,
+then a Letter PDF, the facing-pages PDF and the print-shop PDF. All three passed: only pure black
+and white line art, every font embedded, every drawing on a right-hand page with facing pages,
+trim and bleed boxes on the print-shop file. What it showed:
+
+- **The local engine's thin gray strokes break in the cleanup.** Raw pages are detailed but drawn
+  like a pencil sketch; `lineart.clean` keeps only the darkest pixels, so busy pages (pigeons,
+  sunflower, butterfly) come out as broken, open lines that cannot be colored. Gemini's pages do
+  not have this problem. Next step: a cleanup for sketch-like input (see "Still open" in
+  [spike.md](spike.md)).
+- The model sometimes draws something else: the butterfly photo became a bag and some plants.
+- Pressing Enter in the Commons link box reruns the page and closes **Add photos**; clicking the
+  button works.
 
 ## Risks
 

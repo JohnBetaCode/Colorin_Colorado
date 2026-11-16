@@ -186,7 +186,8 @@ def review(book: Book) -> Review:
     if page_range is None:
         add("error", "ink_not_offered")
     elif pages < page_range[0]:
-        add("error", "too_few_pages" if book.blank_backs else "too_few_pages_no_backs", pages=pages, min=page_range[0])
+        two_per_drawing = book.blank_backs or book.layout == "facing"
+        add("error", "too_few_pages" if two_per_drawing else "too_few_pages_no_backs", pages=pages, min=page_range[0])
     if pages > MAX_PAGES:
         add("error", "too_many_pages", pages=pages, max=MAX_PAGES)
     not_for_sale = [p for p in report.included if p.license in LICENSES_NOT_FOR_SALE]
@@ -196,7 +197,7 @@ def review(book: Book) -> Review:
         add("error", "fonts")
     if lowest is not None and book.list_price < lowest:
         add("error", "price_too_low", price=lowest, symbol=symbol)
-    if not book.blank_backs:
+    if not book.blank_backs and book.layout != "facing":  # facing: behind each drawing is a photo
         add("warning", "no_blank_backs")
     if report.not_approved:
         add("warning", "not_approved", names=_names(report.not_approved))

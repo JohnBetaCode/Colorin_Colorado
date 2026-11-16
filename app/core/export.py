@@ -7,8 +7,13 @@ pure black or pure white, and never below ``PRINT_DPI``; reference photos are
 re-encoded as bounded JPEGs. Every font is embedded, which KDP requires. No Gemini
 calls are made.
 
-Output goes to ``books/<slug>/exports/<slug>-<timestamp>.pdf``. The wraparound KDP
-cover is built by ``cover.py``.
+Two layouts (``Book.layout``): ``bottom_box``, described above, and ``facing``, where each
+coloring page is a right-hand page and the left-hand page facing it shows the color photo
+and the caption.
+
+Output goes to ``books/<slug>/exports/<slug>-<timestamp>.pdf``; the print-shop version, with
+bleed and crop marks around every page, to ``<slug>-<timestamp>-print-shop.pdf``. The
+wraparound KDP cover is built by ``cover.py``.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from xml.sax.saxutils import escape
 
 import numpy as np
@@ -49,6 +55,13 @@ PAD = 0.14 * inch
 RADIUS = 10
 PRINT_DPI = 300  # KDP's minimum for images
 PHOTO_MAX_PX = 1200
+PHOTO_MAX_PX_FACING = 2400  # a photo filling the left-hand page, at about 300 ppi
+FACING_TEXT_RATIO = 0.34  # most of the left-hand page's height the caption may take
+# Print-shop PDF: white bleed beyond the trim (nothing is drawn to the edge) and, outside it,
+# room for the crop marks, which stop where the bleed starts.
+PRINT_BLEED = 0.125 * inch
+PRINT_SLUG = 0.375 * inch
+PRINT_SHOP_SUFFIX = "-print-shop"
 PHOTO_JPEG_QUALITY = 85
 # Caption text shrinks in steps (body text 14 pt down to ~9 pt) before it overflows.
 TEXT_SCALES = [1 - 0.05 * i for i in range(8)]
@@ -59,9 +72,16 @@ MUTED = colors.HexColor("#5b6470")
 # Andika (SIL) is designed for children learning to read; installed in the Docker image.
 _ANDIKA_DIR = Path("/usr/share/fonts/truetype/andika")
 
-# One page of the interior: "title", "legal", "owner", "blank", an extra (schema.EXTRAS) or a
-# coloring page.
-Sheet = str | Page
+@dataclass
+class PhotoSheet:
+    """The left-hand page of a facing-pages spread: the color photo and the caption of ``page``."""
+
+    page: Page
+
+
+# One page of the interior: "title", "legal", "owner", "blank", an extra (schema.EXTRAS), a
+# coloring page, or the photo page facing one.
+Sheet = str | Page | PhotoSheet
 
 
 @dataclass
@@ -131,6 +151,10 @@ def _layout(book: Book) -> Layout:
 
 
 def _shows_info(book: Book, page: Page) -> bool:
+    """Whether the coloring sheet has the info box: never with facing pages, whose photo
+    and caption are on the page opposite."""
+    if book.layout == "facing":
+        return False
     return page.has_caption or book.include_reference_photo
 
 
@@ -236,14 +260,22 @@ def sheet_area(book: Book, page: Page, layout: Layout) -> tuple[float, float, fl
     return page_templates.drawing_box(book, template, layout.content, page.template_inset)
 
 
+def _facing_text_size(layout: Layout) -> tuple[float, float]:
+    _, _, w, h = layout.content
+    return w, h * FACING_TEXT_RATIO
+
+
 def caption_fits(book: Book, page: Page, fonts: Fonts | None = None) -> bool:
     if not page.has_caption:
         return True
     layout = _layout(book)
+    fonts = fonts or load_fonts()
+    if book.layout == "facing":
+        tw, th = _facing_text_size(layout)
+        return fit_text(lambda scale: _caption(book, page, scale, fonts), tw, th)[2]
     _, info = layout.boxes(True, sheet_area(book, page, layout))
     photo = _photo_box(info, pages.photo_size(book.slug, page)) if book.include_reference_photo else None
     _, _, tw, th = _text_box(info, photo)
-    fonts = fonts or load_fonts()
     return fit_text(lambda scale: _caption(book, page, scale, fonts), tw, th)[2]
 
 
@@ -267,9 +299,9 @@ def line_art_image(path: Path, box: tuple[float, float] | None = None) -> Image.
     return image
 
 
-def _photo_reader(image: Image.Image) -> tuple[ImageReader, tuple[int, int]]:
+def _photo_reader(image: Image.Image, max_px: int = PHOTO_MAX_PX) -> tuple[ImageReader, tuple[int, int]]:
     image = image.convert("RGB")
-    image.thumbnail((PHOTO_MAX_PX, PHOTO_MAX_PX))
+    image.thumbnail((max_px, max_px))
     buffer = BytesIO()
     image.save(buffer, format="JPEG", quality=PHOTO_JPEG_QUALITY, optimize=True)
     buffer.seek(0)
@@ -410,6 +442,37 @@ def _draw_sheet(c: Canvas, book: Book, page: Page, number: int, layout: Layout, 
     c.showPage()
 
 
+def _draw_photo_sheet(c: Canvas, book: Book, page: Page, layout: Layout, fonts: Fonts) -> None:
+    """The left-hand page of a spread: the color photo, large, and the caption under it,
+    both centered on the page as one block. No page number: the drawing opposite has it."""
+    x, y, w, h = layout.content
+    items: list[Paragraph] = []
+    text_h = 0.0
+    if page.has_caption:
+        tw, th = _facing_text_size(layout)
+        items, total, _ = fit_text(lambda scale: _caption(book, page, scale, fonts), tw, th)
+        text_h = min(total, th)
+    photo = None
+    if book.include_reference_photo:
+        reader, size = _photo_reader(pages.cropped_photo(book.slug, page, group=False), PHOTO_MAX_PX_FACING)
+        room = h - (text_h + 2 * GAP if items else 0)
+        scale = min(w / size[0], room / size[1])
+        photo = (reader, size[0] * scale, size[1] * scale)
+    block = (photo[2] if photo else 0) + (2 * GAP if photo and items else 0) + text_h
+    top = y + (h + block) / 2
+    if photo:
+        reader, pw, ph = photo
+        box = (x + (w - pw) / 2, top - ph, pw, ph)
+        c.drawImage(reader, *box)
+        c.setStrokeColor(INK)
+        c.setLineWidth(0.6)
+        c.rect(*box)
+        top -= ph + 2 * GAP
+    if items:
+        draw_text(c, items, (x, y, w, top - y), top)
+    c.showPage()
+
+
 def mosaic_of(book: Book, page: Page) -> tuple[np.ndarray, MosaicSettings]:
     """The grid and settings of the page's selected (mosaic) version."""
     version = page.selected_version
@@ -491,8 +554,14 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
 
     The copyright page, when there is one, is the back of the title page. With blank
     backs every coloring page is a right-hand page with nothing printed behind it.
+
+    With facing pages every coloring page is a right-hand page (an odd page number, the title
+    page being page 1) with its photo page on the left, and a blank page keeps that parity
+    where needed; a mystery mosaic, which has no photo page, is a right-hand page too. Blank
+    backs do not apply to the spreads: the back of a drawing is the next photo page.
     """
     back = ["blank"] if book.blank_backs else []
+    facing = book.layout == "facing"
     ready = extras.available(book, included)
     order: list[Sheet] = ["title"]
     order += ["legal"] if has_legal_page(book, included) else back
@@ -501,7 +570,12 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
     if "color_test" in ready:
         order += ["color_test", *back]
     for page in included:
-        order += [page, *back]
+        if not facing:
+            order += [page, *back]
+        elif page.is_mosaic:
+            order += (["blank"] if len(order) % 2 else []) + [page, *back]
+        else:
+            order += (["blank"] if len(order) % 2 == 0 else []) + [PhotoSheet(page), page]
     # The mystery mosaics' solutions go after the activities, before the diploma and closing page.
     after = [extra for extra in ready if extra != "color_test"]
     split = next((i for i, extra in enumerate(after) if extra in ("diploma", "closing")), len(after))
@@ -510,10 +584,30 @@ def sheets(book: Book, included: list[Page]) -> list[Sheet]:
     return order
 
 
-def export_book_pdf(book: Book, path: Path | None = None) -> Path:
+def _print_shop_canvas(path: Path, layout: Layout, font: str) -> Canvas:
+    """A canvas whose pages carry, around the trimmed page, a white bleed and crop marks.
+
+    The pages are drawn at their trim size; ReportLab adds the border and the marks on each
+    ``showPage``, without scaling what is drawn. The trim and bleed boxes tell the print
+    shop's software where to cut.
+    """
+    border = PRINT_BLEED + PRINT_SLUG
+    marks = SimpleNamespace(borderWidth=border, markLength=PRINT_SLUG, markWidth=0.5, markColor=colors.black, bleedWidth=0, markLast=1)
+    w, h = layout.width, layout.height
+    trim = (border, border, border + w, border + h)
+    bleed = (PRINT_SLUG, PRINT_SLUG, border + w + PRINT_BLEED, border + h + PRINT_BLEED)
+    return Canvas(str(path), pagesize=(w, h), cropMarks=marks, trimBox=trim, bleedBox=bleed, initialFontName=font)
+
+
+def is_print_shop(path: Path) -> bool:
+    return path.stem.endswith(PRINT_SHOP_SUFFIX)
+
+
+def export_book_pdf(book: Book, path: Path | None = None, print_shop: bool = False) -> Path:
     """Build the PDF and return its path. Pages without a coloring page are skipped.
 
-    Without ``path`` it is a new file under ``exports/``.
+    Without ``path`` it is a new file under ``exports/``. ``print_shop`` adds bleed and crop
+    marks around every page, for a print shop (never for Amazon KDP, which rejects marks).
     """
     included = preflight(book).included
     if not included:
@@ -526,17 +620,22 @@ def export_book_pdf(book: Book, path: Path | None = None) -> Path:
         folder = exports_dir(book)
         folder.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        path = folder / f"{book.slug}-{stamp}.pdf"
+        path = folder / f"{book.slug}-{stamp}{PRINT_SHOP_SUFFIX if print_shop else ''}.pdf"
 
     # ReportLab sets the initial font on every page; the default (Helvetica) is never embedded.
-    c = Canvas(str(path), pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
+    if print_shop:
+        c = _print_shop_canvas(path, layout, fonts.regular)
+    else:
+        c = Canvas(str(path), pagesize=(layout.width, layout.height), initialFontName=fonts.regular)
     c.setTitle(book.title)
     c.setCreator("Colorín Colorado")
 
     mysteries = {page.id: n for n, page in enumerate(extras.mysteries(included), start=1)}
     number = 0
     for sheet in sheets(book, included):
-        if isinstance(sheet, Page):
+        if isinstance(sheet, PhotoSheet):
+            _draw_photo_sheet(c, book, sheet.page, layout, fonts)
+        elif isinstance(sheet, Page):
             number += 1
             if sheet.is_mosaic:
                 _draw_mosaic_sheet(c, book, *mosaic_of(book, sheet), number, mysteries[sheet.id], layout, fonts)

@@ -605,12 +605,19 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     # Export
     "export.page_size": {"es": "Tamaño de página", "en": "Page size"},
+    "export.layout": {"es": "Diseño de página", "en": "Page layout"},
+    "export.layout_help": {
+        "es": "Doble página: la foto y el texto van grandes en la página izquierda y el dibujo solo en la derecha, como un libro abierto.",
+        "en": "Facing pages: the photo and the text fill the left-hand page and the drawing has the right-hand page to itself, like an open book.",
+    },
+    "layout.bottom_box": {"es": "Foto y texto debajo del dibujo", "en": "Photo and text under the drawing"},
+    "layout.facing": {"es": "Doble página (foto a la izquierda)", "en": "Facing pages (photo on the left)"},
     "export.include_photo": {"es": "Foto de referencia en cada página", "en": "Reference photo on every page"},
     "export.owner_page": {"es": "Página «Este libro pertenece a»", "en": "“This book belongs to” page"},
     "export.blank_backs": {"es": "Reverso en blanco en cada hoja", "en": "Blank back on every sheet"},
     "export.blank_backs_help": {
-        "es": "Para imprimir a doble cara sin que los marcadores traspasen a otro dibujo.",
-        "en": "For double-sided printing, so markers never bleed into another drawing.",
+        "es": "Para imprimir a doble cara sin que los marcadores traspasen a otro dibujo. En doble página, el reverso de cada dibujo ya es la foto siguiente.",
+        "en": "For double-sided printing, so markers never bleed into another drawing. With facing pages, the back of each drawing is already the next photo.",
     },
     "export.cover": {"es": "Portada", "en": "Cover"},
     "export.cover_first": {"es": "La primera página", "en": "The first page"},
@@ -702,6 +709,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "export.download": {"es": "⬇️ Descargar PDF", "en": "⬇️ Download PDF"},
     "export.latest": {"es": "Último: `exports/{name}` ({size:.1f} MB)", "en": "Latest: `exports/{name}` ({size:.1f} MB)"},
     "export.nothing": {"es": "Convierte al menos una página para exportar.", "en": "Convert at least one page to export."},
+    "export.print_shop": {"es": "🖨️ PDF para imprenta", "en": "🖨️ Print-shop PDF"},
+    "export.print_shop_help": {
+        "es": "El mismo interior con sangrado de 3 mm (0.125 in) y marcas de corte en cada página, para una imprenta o copistería. No lo subas a Amazon KDP: KDP rechaza las marcas de corte.",
+        "en": "The same interior with a 0.125 in (3 mm) bleed and crop marks on every page, for a print shop. Do not upload it to Amazon KDP: KDP rejects crop marks.",
+    },
+    "export.build_print_shop": {"es": "Generar PDF para imprenta", "en": "Build print-shop PDF"},
+    "export.download_print_shop": {"es": "⬇️ Descargar PDF para imprenta", "en": "⬇️ Download print-shop PDF"},
     # Amazon KDP
     "kdp.intro": {
         "es": "Lo que pide Amazon KDP para vender este libro en tapa blanda. Medidas, costos, derechos e impuestos, con fuentes, en `docs/amazon-kdp.md`.",

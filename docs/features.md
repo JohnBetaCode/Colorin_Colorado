@@ -41,6 +41,9 @@ part.
 - **A print-ready PDF**: title page, copyright page with the photo credits, "this book belongs
   to" page, one coloring page per sheet with the reference photo and caption, in Letter, A4,
   8 × 10 or square, with blank backs so markers never bleed into another drawing.
+- **Facing pages**: the photo, large, and its caption on the left, the drawing on the right, like
+  an open book.
+- **A PDF for print shops**: the same interior with bleed and crop marks.
 - **A printable cover**: back, spine and front in one PDF, with a color front image you upload or
   the AI draws from a collage of your pages, a description or the book's theme.
 - **Spanish and English**, for the app and for each book.

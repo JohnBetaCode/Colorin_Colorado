@@ -15,6 +15,9 @@ AgeGroup = Literal["3-5", "6-8", "9+", "adult"]
 Background = Literal["keep", "simplify", "remove"]
 Language = Literal["es", "en"]
 PageSize = Literal["letter", "a4", "8x10", "square"]  # square: 8.5 × 8.5 in
+# bottom_box: the photo and caption in a box under the drawing; facing: the photo and caption on
+# the left-hand page, the drawing alone on the right-hand page.
+PageLayout = Literal["bottom_box", "facing"]
 Marketplace = Literal["us", "uk", "es"]
 Template = Literal["free", "nature", "landmarks", "family"]  # see templates.py  # the Amazon store KDP costs and royalties are estimated for
 Engine = Literal["gemini", "local_gpu", "stable_diffusion", "draft", "mosaic"]
@@ -45,6 +48,7 @@ STYLES: tuple[Style, ...] = ("realistic", "cartoon", "kawaii", "mandala")
 AGE_GROUPS: tuple[AgeGroup, ...] = ("3-5", "6-8", "9+", "adult")
 BACKGROUNDS: tuple[Background, ...] = ("keep", "simplify", "remove")
 PAGE_SIZES: tuple[PageSize, ...] = ("letter", "a4", "8x10", "square")
+PAGE_LAYOUTS: tuple[PageLayout, ...] = ("bottom_box", "facing")
 MARKETPLACES: tuple[Marketplace, ...] = ("us", "uk", "es")
 TEMPLATES: tuple[Template, ...] = ("free", "nature", "landmarks", "family")
 ENGINES: tuple[Engine, ...] = ("gemini", "local_gpu", "stable_diffusion", "draft", "mosaic")
@@ -141,6 +145,7 @@ class Book(BaseModel):
     language: Language = "es"
     second_language: Language | None = None  # captions and fixed labels printed in both languages
     page_size: PageSize = "letter"
+    layout: PageLayout = "bottom_box"
     include_reference_photo: bool = True
     include_owner_page: bool = True
     blank_backs: bool = False

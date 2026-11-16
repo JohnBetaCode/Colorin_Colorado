@@ -20,3 +20,4 @@ venv/
 
 # Prompt spike: downloaded test photos and generated results
 spike/
+.claude/worktrees/

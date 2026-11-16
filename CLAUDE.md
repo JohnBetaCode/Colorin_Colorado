@@ -61,6 +61,10 @@ name a country or city (the author's own books can be about anything).
   local model (`LOCAL_IMAGE_MODEL`): the default in `local_image/server.py`, the commented line in
   `config/.env.example`, the server table in `docs/setup.md`, `<model>-local` at $0 in `PRICING`,
   and `local_image.NON_COMMERCIAL_MODELS` when its license does not allow selling.
+- The PDF has two layouts (`Book.layout`): `bottom_box` and `facing` (photo page on the left, the
+  drawing alone on the right; `export.sheets` keeps every drawing on an odd page). The print-shop
+  PDF (`export_book_pdf(print_shop=True)`) adds bleed and crop marks without scaling anything; it
+  is never the KDP interior (KDP rejects crop marks), and `export.is_print_shop` tells them apart.
 - Amazon KDP numbers (sizes, page ranges, costs, royalties) live in `app/core/kdp.py`, with their
   sources in `docs/amazon-kdp.md`; change them together, and `tests/test_kdp.py`. The interior PDF
   must keep every font embedded and line art at 300 ppi or more.
@@ -85,4 +89,7 @@ open (e.g. between Playwright runs), `docker compose restart app`.
 ## Skills
 
 `.claude/skills/run-app` starts, stops, tests and debugs the app. Prefer its script over ad-hoc
-compose commands.
+compose commands. `.claude/skills/usage-report` summarizes `data/usage.jsonl` (spend and tokens per
+book, model, day or operation; host `python3`, read-only). `.claude/skills/screenshots` regenerates
+`docs/images/ui-*.png` with Playwright from the neutral demo book "Mi mundo para colorear", never
+from the author's books.

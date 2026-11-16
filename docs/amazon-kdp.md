@@ -59,6 +59,10 @@ What the interior contains, in order:
 With blank backs and the owner page, the interior has `4 + 2 × (drawings + extra pages)` pages:
 10 drawings is the 24-page minimum (or 7 drawings and 3 extras), and 50 drawings make 104 pages.
 
+With **facing pages** each drawing is a two-page spread instead (the photo on the left, the drawing
+on the right), so it also adds two pages; the back of each drawing is the next photo, not a blank,
+and the review does not ask for blank backs. Photos printed this large look best with color ink.
+
 ## Cover file
 
 KDP wants **one PDF** with the back cover, the spine and the front cover side by side. 🛒 Amazon
@@ -269,8 +273,9 @@ the cover you upload; Amazon makes it from the cover PDF.
 
 ## What the app does not do
 
-- **Bleed** (art to the edge of the page) and crop marks: the drawings sit inside the margins, so
-  KDP does not need them.
+- **Bleed** (art to the edge of the page) and crop marks for KDP: the drawings sit inside the
+  margins, so KDP does not need them, and it rejects crop marks. The **🖨️ Print-shop PDF** adds both
+  for a local print shop; upload the normal PDF to KDP.
 - **Hardcover**: KDP's large hardcover is 8.25 × 11 in with at least 75 pages, a different trim from
   the interior. Not supported.
 - **Cost estimates for stores other than the US, UK and EU** (Japan, Canada, Australia…).

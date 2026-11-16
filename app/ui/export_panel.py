@@ -8,7 +8,7 @@ import streamlit as st
 
 from app.core import books, export, page_templates, pages
 from app.core.i18n import LANGUAGE_NAMES, t
-from app.core.schema import EXTRAS, PAGE_SIZES, Book, Page
+from app.core.schema import EXTRAS, PAGE_LAYOUTS, PAGE_SIZES, Book, Page
 from app.ui.common import flash, plain, seed
 
 FIRST_PAGE = "first"  # cover option stored as None; not None itself, which a selectbox shows as empty
@@ -154,9 +154,9 @@ def _render_page_templates(book: Book) -> None:
             )
 
 
-def _latest_export(book: Book) -> Path | None:
-    files = sorted(export.exports_dir(book).glob("*.pdf"), key=lambda f: f.stat().st_mtime)
-    return files[-1] if files else None
+def _latest_export(book: Book, print_shop: bool = False) -> Path | None:
+    files = [f for f in export.exports_dir(book).glob("*.pdf") if export.is_print_shop(f) == print_shop]
+    return max(files, key=lambda f: f.stat().st_mtime) if files else None
 
 
 def _render_options(book: Book, report: export.Preflight) -> None:
@@ -180,6 +180,16 @@ def _render_options(book: Book, report: export.Preflight) -> None:
         key=f"export_cover_page_id_{book.slug}",
         on_change=_save_option,
         args=(book.slug, "cover_page_id"),
+    )
+    seed(f"export_layout_{book.slug}", book.layout)
+    col1.selectbox(
+        t("export.layout"),
+        PAGE_LAYOUTS,
+        format_func=lambda layout: t(f"layout.{layout}"),
+        help=t("export.layout_help"),
+        key=f"export_layout_{book.slug}",
+        on_change=_save_option,
+        args=(book.slug, "layout"),
     )
     for field, label, help_key in (
         ("include_reference_photo", "export.include_photo", None),
@@ -245,3 +255,21 @@ def render(book: Book) -> None:
         )
         st.caption(t("export.latest", name=latest.name, size=latest.stat().st_size / 1e6))
         st.pdf(latest.read_bytes(), height=900)
+    _render_print_shop(book)
+
+
+def _render_print_shop(book: Book) -> None:
+    with st.expander(t("export.print_shop")):
+        st.caption(t("export.print_shop_help"))
+        if st.button(t("export.build_print_shop")):
+            with st.spinner(t("export.building")):
+                try:
+                    export.export_book_pdf(book, print_shop=True)
+                except Exception as exc:
+                    st.error(t("export.failed", error=exc))
+        latest = _latest_export(book, print_shop=True)
+        if latest:
+            st.download_button(
+                t("export.download_print_shop"), data=latest.read_bytes(), file_name=latest.name, mime="application/pdf"
+            )
+            st.caption(t("export.latest", name=latest.name, size=latest.stat().st_size / 1e6))
