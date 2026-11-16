@@ -90,3 +90,44 @@ def test_draft_engine_produces_a_cleanable_drawing(photo):
     result = lineart.clean(lineart.draft(photo, "cartoon", "6-8"), "6-8")
     assert _only_black_and_white(result)
     assert (_pixels(result) == 0).any()
+
+
+def _pencil_page() -> bytes:
+    """Two pencil circles: each has a short dark arc and the rest in light gray. A flat gray
+    patch (shading) and a lone faint scribble that touches no dark line."""
+    image = Image.new("L", (1200, 1200), 255)
+    draw = ImageDraw.Draw(image)
+    for box in ((100, 100, 550, 550), (650, 100, 1100, 550)):
+        draw.ellipse(box, outline=185, width=4)  # light pencil, above MAX_THRESHOLD
+        draw.arc(box, 200, 260, fill=40, width=4)  # one dark stretch
+    draw.rectangle((100, 700, 500, 1100), fill=200)  # flat shading
+    draw.line((700, 800, 1100, 900), fill=190, width=3)  # faint, not connected to any dark line
+    return png_bytes(image.convert("RGB"))
+
+
+def _enclosed_white(result: lineart.CleanResult) -> int:
+    """White areas that do not touch the image border: closed shapes a child can color."""
+    white = (_pixels(result) > 127).astype(np.uint8)
+    n, labels = __import__("cv2").connectedComponents(white, connectivity=4)
+    border = set(np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]])))
+    return len(set(range(1, n)) - border)
+
+
+def test_sketch_mode_keeps_faint_lines_that_continue_dark_ones():
+    data = _pencil_page()
+    plain = lineart.clean(data, "9+")
+    sketch = lineart.clean(data, "9+", sketch=True)
+    assert _only_black_and_white(sketch)
+    assert _enclosed_white(plain) == 0  # only the dark arcs survive: open shapes
+    assert _enclosed_white(sketch) == 2  # both circles closed
+    # The shading and the lone faint line stay out: the page is the two circles.
+    h, w = _pixels(sketch).shape
+    assert w > 1.8 * h
+
+
+def test_sketch_mode_leaves_solid_line_art_alone(line_art):
+    plain, sketch = lineart.clean(line_art, "6-8"), lineart.clean(line_art, "6-8", sketch=True)
+    # The antialiased edge of a solid line is all it adds: one pixel, same areas to color.
+    assert abs(sketch.image.size[0] - plain.image.size[0]) <= 4
+    assert sketch.regions == plain.regions and sketch.warnings == plain.warnings
+    assert abs(sketch.black_ratio - plain.black_ratio) < 0.01

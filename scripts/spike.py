@@ -52,7 +52,7 @@ def convert(photo: Path, style: str, age: str, out: Path, engine: str = "gemini"
         return {**result, "error": str(exc), "seconds": round(time.time() - start, 1)}
     (out / name).mkdir(parents=True, exist_ok=True)
     (out / name / f"{style}-{age}-raw.png").write_bytes(raw)
-    cleaned = lineart.clean(raw, age)
+    cleaned = lineart.clean(raw, age, sketch=engine == "local_gpu")
     cleaned.image.save(out / name / f"{style}-{age}-clean.png")
     return {
         **result,
@@ -65,10 +65,10 @@ def convert(photo: Path, style: str, age: str, out: Path, engine: str = "gemini"
     }
 
 
-def reclean(raw: Path, out: Path) -> dict:
+def reclean(raw: Path, out: Path, sketch: bool = False) -> dict:
     name = raw.parent.name
     style, age = raw.name.removesuffix("-raw.png").split("-", 1)
-    cleaned = lineart.clean(raw.read_bytes(), age)
+    cleaned = lineart.clean(raw.read_bytes(), age, sketch=sketch)
     cleaned.image.save(raw.with_name(f"{style}-{age}-clean.png"))
     return {
         "photo": name, "style": style, "age": age, "warnings": cleaned.warnings,
@@ -116,7 +116,7 @@ def main() -> None:
 
     photos = sorted(p for p in args.photos.glob("*.jpg") if not args.only or p.stem in args.only)
     if args.reclean:
-        results = [reclean(raw, args.out) for photo in photos for raw in sorted((args.out / photo.stem).glob("*-raw.png"))]
+        results = [reclean(raw, args.out, args.engine == "local_gpu") for photo in photos for raw in sorted((args.out / photo.stem).glob("*-raw.png"))]
         for result in results:
             print(json.dumps(result))
     else:

@@ -268,7 +268,8 @@ def render_page(book: Book, page: Page, engine: Engine) -> Rendered:
             raw = stable_diffusion.edit_image(photo, prompt)
     else:
         raw = lineart.to_png(lineart.draft(photo, style, book.age_group))
-    cleaned = lineart.clean(raw, book.age_group)
+    # The local model draws in thin gray pencil strokes; the others in solid black.
+    cleaned = lineart.clean(raw, book.age_group, sketch=engine == "local_gpu")
     version = Version(
         n=0,
         engine=engine,

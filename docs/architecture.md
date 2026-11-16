@@ -186,7 +186,10 @@ In order, all at 2400 px on the long side:
 1. **Mockup check**: if the outer strip of the image is mostly not white paper, the model returned
    a photo of a printed page; cut the sheet out.
 2. **Ink** = darker than `min(Otsu, 150)` and not saturated: light gray shading and colors copied
-   from the photo drop out; near-black stays.
+   from the photo drop out; near-black stays. With `sketch=True` (the local GPU engine, which
+   draws in thin gray pencil strokes), lighter thin lines are kept too where they touch that ink:
+   pixels under 225 that are at least 18 levels darker than the paper around them (a black-hat
+   with a 15 px disk, so flat shading does not count), connected to a dark line (hysteresis).
 3. Remove specks; fill tiny white holes inside lines.
 4. **Frames**: remove ink that lives only in the outer 5% ring and runs along a side.
 5. **Hollow fills**: black areas that still contain a disk three strokes wide, and are not tiny

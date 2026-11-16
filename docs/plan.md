@@ -307,10 +307,10 @@ then a Letter PDF, the facing-pages PDF and the print-shop PDF. All three passed
 and white line art, every font embedded, every drawing on a right-hand page with facing pages,
 trim and bleed boxes on the print-shop file. What it showed:
 
-- **The local engine's thin gray strokes break in the cleanup.** Raw pages are detailed but drawn
-  like a pencil sketch; `lineart.clean` keeps only the darkest pixels, so busy pages (pigeons,
-  sunflower, butterfly) come out as broken, open lines that cannot be colored. Gemini's pages do
-  not have this problem. Next step: a cleanup for sketch-like input (see "Still open" in
+- **The local engine's thin gray strokes broke in the cleanup.** Raw pages are detailed but drawn
+  like a pencil sketch; `lineart.clean` kept only the darkest pixels, so busy pages (pigeons,
+  sunflower, butterfly) came out as broken, open lines that cannot be colored. Fixed the same day
+  with the cleanup's sketch mode, on for the local GPU engine (see "Pencil strokes" in
   [spike.md](spike.md)).
 - The model sometimes draws something else: the butterfly photo became a bag and some plants.
 - Pressing Enter in the Commons link box reruns the page and closes **Add photos**; clicking the

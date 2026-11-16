@@ -5,7 +5,9 @@ The image model is asked for pure line art but is never trusted to deliver it.
 colored areas dropped, large black fills hollowed out to their outline, specks
 removed, lines at least as thick as the age group needs, cropped to the drawing
 with a white margin. When the model returns a photo of a printed page instead of
-the artwork, the page is cut out of the photo first. ``draft`` is the free, offline engine: it
+the artwork, the page is cut out of the photo first. ``sketch=True`` is for engines that
+draw in thin gray pencil strokes (the local GPU engine): faint lines are kept where they
+continue a dark one, instead of breaking the drawing into dashes. ``draft`` is the free, offline engine: it
 flattens the photo into a few color areas (mean shift and k-means) whose borders become the lines,
 cleaned the same way.
 """
@@ -25,6 +27,15 @@ AGE_GROUPS = ("3-5", "6-8", "9+", "adult")
 # 7.5 in on its long side, so 2400 px is ~320 DPI and 13 px is ~1 mm.
 WORK_SIZE = 2400
 MIN_STROKE_PX = {"3-5": 16, "6-8": 10, "9+": 6, "adult": 4}
+
+# Sketch mode (hysteresis): a light pencil line is ink when it is darker than SKETCH_MAX_GRAY,
+# stands out by SKETCH_CONTRAST from the paper around it (a black-hat with a disk of
+# SKETCH_LINE_PX, so flat gray shading does not count), and touches a dark line. Measured on
+# the local GPU engine's pages, whose darkest tenth of line pixels is mid-gray (60-115) where
+# Gemini's is near black (docs/spike.md, "Pencil strokes").
+SKETCH_MAX_GRAY = 225
+SKETCH_CONTRAST = 18
+SKETCH_LINE_PX = 15
 
 # Ink is anything darker than this (or Otsu's threshold, if lower), so light gray
 # shading drops out instead of turning into black blobs. Saturated pixels are color
@@ -182,6 +193,18 @@ def _thicken(ink: np.ndarray, target: int, min_area: int) -> tuple[np.ndarray, f
     return ink, stroke
 
 
+def _sketch_ink(gray: np.ndarray, colored: np.ndarray, strong: np.ndarray) -> np.ndarray:
+    """``strong`` plus the faint thin lines connected to it (hysteresis thresholding)."""
+    closed = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, _disk(SKETCH_LINE_PX))
+    line = (closed.astype(np.int16) - gray.astype(np.int16)) > SKETCH_CONTRAST
+    weak = ((gray < SKETCH_MAX_GRAY) & line & ~colored) | strong
+    n, labels = cv2.connectedComponents(weak.astype(np.uint8), connectivity=8)
+    seeded = np.zeros(n, bool)
+    seeded[np.unique(labels[strong])] = True
+    seeded[0] = False
+    return seeded[labels]
+
+
 def _flat_dark_share(gray: np.ndarray, colored: np.ndarray) -> float:
     """Share of smooth dark-gray area: shading that thresholding would turn into black."""
     values = gray.astype(np.float32)
@@ -191,8 +214,11 @@ def _flat_dark_share(gray: np.ndarray, colored: np.ndarray) -> float:
     return float(((flat > NEAR_BLACK) & (flat < MAX_THRESHOLD) & (std < 12) & ~colored).mean())
 
 
-def clean(data: bytes | Image.Image, age_group: str) -> CleanResult:
-    """Turn any image into a 1-bit coloring page and report quality warnings."""
+def clean(data: bytes | Image.Image, age_group: str, sketch: bool = False) -> CleanResult:
+    """Turn any image into a 1-bit coloring page and report quality warnings.
+
+    ``sketch``: the image is drawn in light pencil strokes; keep the faint parts of its lines.
+    """
     rgb, mockup = _crop_to_paper(np.array(load_image(data)))
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     saturation = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[:, :, 1]
@@ -205,6 +231,8 @@ def clean(data: bytes | Image.Image, age_group: str) -> CleanResult:
     colored = _resize_long_side(colored.astype(np.uint8) * 255, WORK_SIZE) > 127
     otsu, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     ink = (gray < min(otsu, MAX_THRESHOLD)) & ~colored
+    if sketch:
+        ink = _sketch_ink(gray, colored, ink)
 
     h, w = ink.shape
     speck = max(12, int(h * w * 2e-5))

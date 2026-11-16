@@ -21,7 +21,9 @@ name a country or city (the author's own books can be about anything).
   nothing under `app/` imports torch or diffusers. It reuses Gemini's prompt (`build_local_prompt`)
   and records the model on each version: Qwen-Image-2.1's license forbids selling its pages, and
   `kdp.review` warns about them (`local_image.NON_COMMERCIAL_MODELS`).
-- Every coloring page an engine returns goes through `lineart.clean` before it is stored or shown.
+- Every coloring page an engine returns goes through `lineart.clean` before it is stored or shown;
+  the local GPU engine's with `sketch=True` (its strokes are thin gray pencil; see "Pencil strokes"
+  in `docs/spike.md`). Gemini keeps the plain threshold.
   Coloring pages are 1-bit; never JPEG-encode line art anywhere (the PDF embeds it losslessly).
   Mystery mosaics (`mosaic.py`) are the one exception: the grid is stored as data
   (`v<n>-raw.png`), drawn as vectors in the PDF (faint gray is impossible in 1 bit), and the

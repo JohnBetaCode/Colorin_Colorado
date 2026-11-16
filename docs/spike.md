@@ -123,7 +123,8 @@ What it does:
 - **Clear subjects are its strength.** The toucan, the boy for 3–5 and the two dogs come out
   faithful and clean: every page drawn with the Gemini prompt passed `lineart.clean` with no
   warnings. The boy is as good as Gemini's.
-- **Detailed scenes lose detail in the cleanup, not in the drawing.** The raw Las Lajas page has
+- **Detailed scenes lose detail in the cleanup, not in the drawing** (fixed on 2026-11-16 by
+  sketch mode, see "Pencil strokes" below). The raw Las Lajas page has
   the whole valley, but in thin gray pencil-like lines; `lineart.clean` keeps only the darkest, so
   the page is the sanctuary and its bridge with little around them, where Gemini's keeps the
   vegetation. Darkening the raw page first (levels with the white point at 230 or 200) made it
@@ -141,6 +142,29 @@ its pages are for trying styles and for books that will not be sold. Each versio
 model, and the KDP view warns about selected pages drawn with it.
 
 Not checked yet: kawaii, mandala, adults, the `remove` background, and Qwen-Image-2.1-Turbo.
+
+## Pencil strokes (2026-11-16)
+
+The first full 10-photo book on the local GPU engine showed the cost of its gray strokes: busy pages
+came out as broken, open lines, with 3 to 9 areas to color where the raw drawing had dozens. Among
+the line pixels (darker than 230), the darkest tenth is near black on Gemini's pages (0–35) and
+mid-gray on the local model's (57–115), so the fixed threshold (`min(Otsu, 150)`) kept only a
+quarter to a third of its ink.
+
+`lineart.clean(sketch=True)` keeps a light line where it continues a dark one: hysteresis, with
+"light line" meaning under 225 and at least 18 levels darker than the paper around it (black-hat,
+15 px disk), so flat gray shading and lone faint marks still drop out. On the ten pages of that book
+and the seven local pages above, areas to color went from 3–29 to 7–86 and `too_few_regions` went
+away; clear subjects (the boy, the dogs) are unchanged. Darkening the whole page first, tried on
+2026-11-12, failed because it also darkened shading and texture; the hysteresis only adds what is
+connected to a line.
+
+![Local GPU pages: the raw drawing, the cleanup before, and sketch mode](images/local-gpu-sketch.jpg)
+
+It is only on for the local GPU engine. On Gemini's pages it changes little, except where Gemini
+also drew in gray pencil (Las Lajas 9+): there the page gets denser and loses areas to color (54 to
+28), so Gemini keeps the plain threshold. Stored versions keep their pages; converting again on the
+local GPU uses sketch mode.
 
 ## Still open
 
