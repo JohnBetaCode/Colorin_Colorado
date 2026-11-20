@@ -7,7 +7,7 @@ streamlit-pdf==2.1.0          # inline viewer for st.pdf
 pillow==13.0.0
 pillow-heif==1.8.1            # HEIC/HEIF uploads (iPhone photos)
 opencv-python-headless==5.0.0.93
-numpy==2.2.6                  # opencv-python-headless 5 accepts any numpy>=2
+numpy==2.5.5                  # opencv-python-headless 5 accepts any numpy>=2
 pypdfium2==5.15.2             # renders the PDFs into the listing images
 httpx==0.28.1                 # Wikimedia Commons (commons.py) and the model download (background.py)
 requests==2.34.2              # the Stable Diffusion server (stable_diffusion.py)
