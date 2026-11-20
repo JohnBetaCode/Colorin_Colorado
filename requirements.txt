@@ -15,4 +15,4 @@ onnxruntime==1.31.1           # runs the background-removal model (background.py
 
 # Tests
 pytest==9.2.0
-pypdf==6.21.4                 # reads images back out of exported PDFs
+pypdf==7.1.0                 # reads images back out of exported PDFs
